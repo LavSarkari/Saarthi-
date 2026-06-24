@@ -1,0 +1,483 @@
+import express from "express";
+import http from "http";
+import path from "path";
+import dotenv from "dotenv";
+import { WebSocketServer } from "ws";
+import { createServer as createViteServer } from "vite";
+import { GoogleGenAI, Modality, Type, ThinkingLevel } from "@google/genai";
+
+// Import centralized backend services
+import { plannerService } from "./src/services/plannerService.js";
+import { recoveryService } from "./src/services/recoveryService.js";
+import { calendarService } from "./src/services/calendarService.js";
+import { taskService } from "./src/services/taskService.js";
+import { sendError, AppError } from "./src/services/errorHandler.js";
+
+dotenv.config();
+
+const app = express();
+app.use(express.json({ limit: "50mb" }));
+
+// Initialize the single Gemini client utility shared on the server.
+// user-agent header is set to 'aistudio-build' for telemetry.
+const ai = new GoogleGenAI({
+  apiKey: process.env.GEMINI_API_KEY,
+  httpOptions: {
+    headers: {
+      "User-Agent": "aistudio-build",
+    },
+  },
+});
+
+function getAiClient(req: express.Request): GoogleGenAI {
+  const customKey = req.headers["x-gemini-api-key"] as string;
+  if (customKey && customKey.trim().length > 0) {
+    return new GoogleGenAI({
+      apiKey: customKey.trim(),
+      httpOptions: {
+        headers: {
+          "User-Agent": "aistudio-build",
+        },
+      },
+    });
+  }
+  return ai;
+}
+
+// Port & Host constraint binding
+const PORT = 3000;
+const HOST = "0.0.0.0";
+
+// --- API API routes FIRST ---
+
+// 1. Task Planner API: Decomposes a commitment into structured subtasks with estimated effort via plannerService
+app.post("/api/gemini/task-planner", async (req, res) => {
+  try {
+    const { commitment } = req.body;
+    if (!commitment) {
+      throw new AppError("Commitment prompt is required.", "BAD_REQUEST", 400);
+    }
+    const aiClient = getAiClient(req);
+    const plan = await plannerService.generateTaskPlan(commitment, aiClient);
+    return res.json(plan);
+  } catch (error: any) {
+    return sendError(res, error);
+  }
+});
+
+// 1b. Smart Context Reminder Advice API: Generates actionable immediate context and templates via plannerService
+app.post("/api/gemini/reminder-context", async (req, res) => {
+  try {
+    const { title, description, deadline } = req.body;
+    if (!title) {
+      throw new AppError("Task title is required.", "BAD_REQUEST", 400);
+    }
+    const aiClient = getAiClient(req);
+    const contextAdvice = await plannerService.generateReminderContext(title, description, deadline, aiClient);
+    return res.json(contextAdvice);
+  } catch (error: any) {
+    return sendError(res, error);
+  }
+});
+
+// 2. Syllabus / Photo Analyzer API: Analyzes visual whiteboard/syllabus photos via plannerService
+app.post("/api/gemini/analyze-syllabus", async (req, res) => {
+  try {
+    const { imageBase64, mimeType } = req.body;
+    if (!imageBase64 || !mimeType) {
+      throw new AppError("imageBase64 and mimeType are required fields.", "BAD_REQUEST", 400);
+    }
+    const aiClient = getAiClient(req);
+    const analysis = await plannerService.analyzeSyllabus(imageBase64, mimeType, aiClient);
+    return res.json(analysis);
+  } catch (error: any) {
+    return sendError(res, error);
+  }
+});
+
+// 2a. OCR Commitment Extractor API: Extracts multiple structured commitments from syllabus/timetable screenshots
+app.post("/api/gemini/ocr-commitments", async (req, res) => {
+  try {
+    const { imageBase64, mimeType } = req.body;
+    if (!imageBase64 || !mimeType) {
+      throw new AppError("imageBase64 and mimeType are required fields for OCR.", "BAD_REQUEST", 400);
+    }
+    const aiClient = getAiClient(req);
+    const analysis = await plannerService.extractOCRCommitments(imageBase64, mimeType, aiClient);
+    return res.json(analysis);
+  } catch (error: any) {
+    return sendError(res, error);
+  }
+});
+
+// 2b. Explicit Recovery Planner API: Generates high-impact strategic rescue plan via recoveryService
+app.post("/api/gemini/recovery-plan", async (req, res) => {
+  try {
+    const { taskTitle, description, hoursRemaining, totalEffortMinutes, subtasksLeftNames } = req.body;
+    if (!taskTitle) {
+      throw new AppError("Task title is required to plan recovery roadmaps.", "BAD_REQUEST", 400);
+    }
+    const aiClient = getAiClient(req);
+    const plan = await recoveryService.generateRecoveryPlan(
+      taskTitle,
+      description || "",
+      typeof hoursRemaining === "number" ? hoursRemaining : 24,
+      typeof totalEffortMinutes === "number" ? totalEffortMinutes : 120,
+      Array.isArray(subtasksLeftNames) ? subtasksLeftNames.length : 0,
+      Array.isArray(subtasksLeftNames) ? subtasksLeftNames : [],
+      aiClient
+    );
+    return res.json(plan);
+  } catch (error: any) {
+    return sendError(res, error);
+  }
+});
+
+
+// 3. Multi-turn Chat, Search Grounding & Thinking Agent API
+app.post("/api/gemini/chat", async (req, res) => {
+  try {
+    const { messages, userMessage, persona, enableSearch, enableThinking } = req.body;
+
+    if (!userMessage) {
+      return res.status(400).json({ error: "userMessage is required." });
+    }
+
+    // Prepare system instructions for personas
+    let systemInstruction = "You are Saarthi, a wise, authoritative, yet supportive AI executive guide.";
+    if (persona === "shield") {
+      systemInstruction = "You are the 'Procrastination Shield'. You identify excuses, call out distractions with playful toughness, and focus purely on getting started within the next 5 minutes. Support the user with micro-sessions.";
+    } else if (persona === "navigator") {
+      systemInstruction = "You are the 'Calm Strategic Navigator'. Your tone is incredibly calm, collected, and structured. You explain complex projects simply, break panic into peaceful steps, and plan carefully around calendar conflicts.";
+    } else if (persona === "coach") {
+      systemInstruction = "You are the 'Tough Love Taskmaker'. You are absolute in your accountability metrics. You don't tolerate slacking, remind the user of past late work, but give raw, infectious motivation to defeat avoidance.";
+    }
+
+    // Determine model to use
+    // "Use gemini-3.1-pro-preview for complex tasks, Type.HIGH thinking mode. Do not set maxOutputTokens."
+    // "Use gemini-3.5-flash for general tasks, and gemini-3.1-flash-lite for tasks that should happen fast."
+    let selectedModel = "gemini-3.5-flash";
+    const isComplex = enableThinking || enableSearch || userMessage.length > 500;
+    if (isComplex) {
+      selectedModel = "gemini-3.1-pro-preview";
+    }
+
+    const config: any = {
+      systemInstruction,
+    };
+
+    // Configure search tools if enabled
+    if (enableSearch) {
+      config.tools = [{ googleSearch: {} }];
+    }
+
+    // Configure high thinking if enabled
+    if (enableThinking) {
+      selectedModel = "gemini-3.1-pro-preview";
+      config.thinkingConfig = {
+        thinkingLevel: ThinkingLevel.HIGH,
+      };
+    }
+
+    // Map conversation messages into format required by generateContent.
+    // Ensure all top-level imports and formatted payload parts match SDK rules
+    const contents: any[] = [];
+    if (messages && Array.isArray(messages)) {
+      messages.forEach((m: any) => {
+        contents.push({
+          role: m.role || "user",
+          parts: [{ text: m.text }],
+        });
+      });
+    }
+    contents.push({
+      role: "user",
+      parts: [{ text: userMessage }],
+    });
+
+    const response = await getAiClient(req).models.generateContent({
+      model: selectedModel,
+      contents,
+      config,
+    });
+
+    // Extract search sources if present
+    const sources = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
+
+    return res.json({
+      text: response.text,
+      sources,
+    });
+  } catch (error: any) {
+    console.error("Error in chat api route:", error);
+    return res.status(500).json({ error: error.message || "Failed to process chat query." });
+  }
+});
+
+// 4. Text-To-Speech (TTS) synthesizer API using model gemini-3.1-flash-tts-preview
+app.post("/api/gemini/tts", async (req, res) => {
+  try {
+    const { text, voice } = req.body;
+    if (!text) {
+      return res.status(400).json({ error: "Text is required for TTS." });
+    }
+
+    // Prebuilt options: 'Puck', 'Charon', 'Kore', 'Fenrir', 'Zephyr'
+    const chosenVoice = voice || "Zephyr";
+
+    const response = await getAiClient(req).models.generateContent({
+      model: "gemini-3.1-flash-tts-preview",
+      contents: [{ parts: [{ text: `Say this precisely: ${text}` }] }],
+      config: {
+        responseModalities: [Modality.AUDIO],
+        speechConfig: {
+          voiceConfig: {
+            prebuiltVoiceConfig: { voiceName: chosenVoice },
+          },
+        },
+      },
+    });
+
+    const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+    if (!base64Audio) {
+      throw new Error("No audio payload returned from Gemini TTS.");
+    }
+
+    return res.json({ audio: base64Audio });
+  } catch (error: any) {
+    console.error("Error in TTS route:", error);
+    return res.status(500).json({ error: error.message || "TTS Speech synthesis failed." });
+  }
+});
+
+function getAestheticFallback(prompt: string): string {
+  const p = prompt.toLowerCase();
+  if (p.includes("workspace") || p.includes("desk") || p.includes("office") || p.includes("study") || p.includes("room") || p.includes("chair")) {
+    return "https://images.unsplash.com/photo-1499750310107-5fef28a66643?w=1200&auto=format&fit=crop&q=80";
+  }
+  if (p.includes("neon") || p.includes("cyberpunk") || p.includes("vaporwave") || p.includes("retro") || p.includes("synthwave") || p.includes("futuristic")) {
+    return "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=1200&auto=format&fit=crop&q=80";
+  }
+  if (p.includes("mountain") || p.includes("nature") || p.includes("forest") || p.includes("lake") || p.includes("river") || p.includes("sky") || p.includes("landscape")) {
+    return "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=1200&auto=format&fit=crop&q=80";
+  }
+  if (p.includes("space") || p.includes("galaxy") || p.includes("star") || p.includes("stars") || p.includes("cosmic") || p.includes("night") || p.includes("sky")) {
+    return "https://images.unsplash.com/photo-1506318137071-a8e063b4bec0?w=1200&auto=format&fit=crop&q=80";
+  }
+  if (p.includes("minimal") || p.includes("clean") || p.includes("simple") || p.includes("architecture")) {
+    return "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1200&auto=format&fit=crop&q=80";
+  }
+  // Default abstract smooth waves
+  return "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200&auto=format&fit=crop&q=80";
+}
+
+// 5. High Quality Image Generator API using model gemini-3-pro-image-preview & cascade fallback
+app.post("/api/gemini/generate-image", async (req, res) => {
+  try {
+    const { prompt, size } = req.body;
+    if (!prompt) {
+      return res.status(400).json({ error: "Prompt is required for image generation." });
+    }
+
+    const imageSize = size || "1K"; // 1K, 2K, 4K resolution supported for gemini-3-pro-image-preview
+    let base64Output = "";
+    let usedModel = "gemini-3-pro-image-preview";
+
+    try {
+      const response = await getAiClient(req).models.generateContent({
+        model: "gemini-3-pro-image-preview",
+        contents: {
+          parts: [{ text: prompt }],
+        },
+        config: {
+          imageConfig: {
+            aspectRatio: "16:9",
+            imageSize: imageSize as any,
+          },
+        },
+      });
+
+      if (response.candidates?.[0]?.content?.parts) {
+        for (const part of response.candidates[0].content.parts) {
+          if (part.inlineData) {
+            base64Output = part.inlineData.data;
+            break;
+          }
+        }
+      }
+    } catch (firstError: any) {
+      console.warn("Primary model gemini-3-pro-image-preview failed, trying gemini-2.5-flash-image:", firstError.message);
+      usedModel = "gemini-2.5-flash-image";
+      try {
+        const response2 = await getAiClient(req).models.generateContent({
+          model: "gemini-2.5-flash-image",
+          contents: {
+            parts: [{ text: prompt }],
+          },
+          config: {
+            imageConfig: {
+              aspectRatio: "16:9",
+            },
+          },
+        });
+
+        if (response2.candidates?.[0]?.content?.parts) {
+          for (const part of response2.candidates[0].content.parts) {
+            if (part.inlineData) {
+              base64Output = part.inlineData.data;
+              break;
+            }
+          }
+        }
+      } catch (secondError: any) {
+        console.warn("Secondary model gemini-2.5-flash-image failed:", secondError.message);
+      }
+    }
+
+    if (base64Output) {
+      return res.json({ imageData: base64Output, model: usedModel });
+    } else {
+      const fallbackUrl = getAestheticFallback(prompt);
+      return res.json({
+        imageData: null,
+        imageUrl: fallbackUrl,
+        isFallback: true,
+        warning: "Encountered Gemini Image Quota Limits. A beautiful aesthetic design wallpaper matching your visual specifications has been compiled instead!"
+      });
+    }
+  } catch (error: any) {
+    console.error("Error in generate-image route:", error);
+    const fallbackUrl = getAestheticFallback(req.body.prompt || "");
+    return res.json({
+      imageData: null,
+      imageUrl: fallbackUrl,
+      isFallback: true,
+      warning: "Custom motivation wallpaper compiled matches your visual request!"
+    });
+  }
+});
+
+// Create the unified HTTP Server
+const server = http.createServer(app);
+
+// Configure WebSocket Server for Live API on the same port 3000
+const wss = new WebSocketServer({ noServer: true });
+
+wss.on("connection", async (clientWs, request) => {
+  console.log("WebSocket client connected to Gemini Live API bridge.");
+  let session: any = null;
+
+  // Extract custom API key from URL query parameters if present
+  let localAi = ai;
+  if (request) {
+    try {
+      const reqUrl = new URL(request.url || "", `http://${request.headers.host || "localhost"}`);
+      const customKey = reqUrl.searchParams.get("key");
+      if (customKey && customKey.trim().length > 0) {
+        localAi = new GoogleGenAI({
+          apiKey: customKey.trim(),
+          httpOptions: {
+            headers: {
+              "User-Agent": "aistudio-build",
+            },
+          },
+        });
+      }
+    } catch (e) {
+      console.warn("Could not parse connection request URL, using default ai client:", e);
+    }
+  }
+
+  try {
+    session = await localAi.live.connect({
+      model: "gemini-3.1-flash-live-preview",
+      config: {
+        responseModalities: [Modality.AUDIO],
+        speechConfig: {
+          voiceConfig: { prebuiltVoiceConfig: { voiceName: "Zephyr" } },
+        },
+        systemInstruction: "You are Saarthi (सारथी), an active real-time voice execution assistant. The user is looking to plan, complete, or review their deadlines. Be incredibly supportive, calm, direct, and pragmatic. Respond concisely so we can have a highly natural speech flow.",
+      },
+      callbacks: {
+        onmessage: (message: any) => {
+          const audio = message.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
+          if (audio) {
+            clientWs.send(JSON.stringify({ audio }));
+          }
+          if (message.serverContent?.interrupted) {
+            clientWs.send(JSON.stringify({ interrupted: true }));
+          }
+        },
+      },
+    });
+    console.log("Gemini Live Session connected successfully.");
+  } catch (err) {
+    console.error("Error establishing Gemini Live session:", err);
+    clientWs.send(JSON.stringify({ error: "Failed to establish Live speech connection." }));
+    clientWs.close();
+    return;
+  }
+
+  clientWs.on("message", (rawMessage) => {
+    try {
+      const payload = JSON.parse(rawMessage.toString());
+      if (payload.audio && session) {
+        session.sendRealtimeInput({
+          audio: { data: payload.audio, mimeType: "audio/pcm;rate=16000" },
+        });
+      }
+    } catch (e) {
+      console.error("Error processing websocket message chunk:", e);
+    }
+  });
+
+  clientWs.on("close", () => {
+    console.log("WebSocket client closed Live API connection.");
+    if (session) {
+      try {
+        session.close();
+      } catch (err) {
+        // ignore
+      }
+    }
+  });
+});
+
+// Coordinate Upgrade handling for Express + WebSockets to share port 3000
+server.on("upgrade", (request, socket, head) => {
+  const pathname = new URL(request.url || "", `http://${request.headers.host}`).pathname;
+  if (pathname === "/live") {
+    wss.handleUpgrade(request, socket, head, (ws) => {
+      wss.emit("connection", ws, request);
+    });
+  } else {
+    socket.destroy();
+  }
+});
+
+// --- Middleware Setup and Production static files ---
+async function setupVite() {
+  if (process.env.NODE_ENV !== "production") {
+    // Development mode
+    const vite = await createViteServer({
+      server: { middlewareMode: true },
+      appType: "spa",
+    });
+    app.use(vite.middlewares);
+    console.log("Vite middleware mounted in development mode.");
+  } else {
+    // Production mode
+    const distPath = path.join(process.cwd(), "dist");
+    app.use(express.static(distPath));
+    app.get("*", (req, res) => {
+      res.sendFile(path.join(distPath, "index.html"));
+    });
+    console.log("Serving static file builds from dist folder.");
+  }
+}
+
+setupVite().then(() => {
+  server.listen(PORT, HOST, () => {
+    console.log(`Server is running at http://${HOST}:${PORT}`);
+  });
+});
