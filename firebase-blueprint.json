@@ -1,0 +1,89 @@
+{
+  "entities": {
+    "Task": {
+      "title": "Task",
+      "description": "A study or commitment task with its subtasks and risk factors",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "The Firebase Auth user ID of the owner"
+        },
+        "title": {
+          "type": "string",
+          "description": "Explicit title of the commitment"
+        },
+        "description": {
+          "type": "string",
+          "description": "Longer text description of the commitment"
+        },
+        "complexity": {
+          "type": "string",
+          "enum": ["low", "medium", "high"],
+          "description": "Syllabus or commitment complexity score"
+        },
+        "totalEffortMinutes": {
+          "type": "integer",
+          "description": "Sum of all estimated subtask minutes"
+        },
+        "deadline": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Date-time when the commitment is due"
+        },
+        "sessionsPlanned": {
+          "type": "integer",
+          "description": "Count of total subtask sessions planned"
+        },
+        "sessionsCompleted": {
+          "type": "integer",
+          "description": "Count of subtasks that have been finished"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When the task was created"
+        },
+        "googleCalendarSynced": {
+          "type": "boolean",
+          "description": "Whether this task was added to Google Calendar"
+        },
+        "googleTasksSynced": {
+          "type": "boolean",
+          "description": "Whether this task was added to Google Tasks"
+        }
+      },
+      "required": ["userId", "title", "createdAt"]
+    },
+    "UserSettings": {
+      "title": "UserSettings",
+      "description": "User specific settings including API key and linked Telegram account",
+      "type": "object",
+      "properties": {
+        "geminiApiKey": {
+          "type": "string",
+          "description": "Custom Gemini API Key provided by the user"
+        },
+        "telegramChatId": {
+          "type": "string",
+          "description": "Linked Telegram chat ID of the user"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When the settings were last updated"
+        }
+      }
+    }
+  },
+  "firestore": {
+    "/tasks/{taskId}": {
+      "schema": "Task",
+      "description": "User commitments and action plans"
+    },
+    "/userSettings/{userId}": {
+      "schema": "UserSettings",
+      "description": "Personalized keys and chat links"
+    }
+  }
+}

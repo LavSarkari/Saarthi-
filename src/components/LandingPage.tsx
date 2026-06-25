@@ -170,28 +170,52 @@ export default function LandingPage({ onLaunch, isLoggedIn }: LandingPageProps) 
       <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff03_1px,transparent_1px),linear-gradient(to_bottom,#ffffff03_1px,transparent_1px)] bg-[size:40px_40px] pointer-events-none" />
 
       {/* Floating Header */}
-      <header className="sticky top-0 z-40 backdrop-blur-xl border-b border-white/5 bg-black/60">
-        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="p-1.5 rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-500 shadow-md shadow-indigo-500/20">
-              <Sparkles className="w-4 h-4 text-white animate-pulse" />
+      <header className="sticky top-0 z-40 backdrop-blur-md border-b border-white/[0.06] bg-black/70">
+        <div className="max-w-7xl mx-auto px-6 h-18 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3 hover:opacity-90 transition-opacity">
+            <div className="h-9 w-9 rounded-xl bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500 p-0.5 shadow-lg shadow-indigo-500/10 flex items-center justify-center">
+              <div className="h-full w-full bg-black rounded-[10px] flex items-center justify-center">
+                <Sparkles className="w-4.5 h-4.5 text-indigo-400 animate-pulse" />
+              </div>
             </div>
-            <span className="font-display font-bold text-base tracking-tight text-white">Saarthi</span>
-            <span className="text-[9px] font-mono tracking-wider bg-white/10 text-slate-300 px-1.5 py-0.5 rounded uppercase font-bold">AI Companion</span>
+            <div className="flex flex-col">
+              <div className="flex items-center gap-2">
+                <span className="font-display font-bold text-base tracking-tight text-white leading-none">Saarthi</span>
+                <span className="text-[8px] font-mono tracking-widest bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 px-1.5 py-0.5 rounded uppercase font-bold leading-none">
+                  Copilot
+                </span>
+              </div>
+              <span className="text-[9px] text-slate-500 font-medium tracking-tight mt-0.5">Syllabus & Deadline Execution</span>
+            </div>
           </div>
 
-          <nav className="hidden md:flex items-center gap-8 text-[11px] font-mono tracking-wider uppercase text-slate-400">
-            <a href="#problem" className="hover:text-white transition-colors">Philosophy</a>
-            <a href="#features" className="hover:text-white transition-colors">Features</a>
-            <a href="#innovation" className="hover:text-white transition-colors">Confidence Engine</a>
-            <a href="#ocr" className="hover:text-white transition-colors">OCR Import</a>
-            <a href="#google" className="hover:text-white transition-colors">Google Cloud</a>
+          <nav className="hidden md:flex items-center gap-8 text-[11px] font-mono tracking-widest uppercase text-slate-400">
+            <a href="#problem" className="hover:text-white transition-colors relative group py-2">
+              Philosophy
+              <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-indigo-500 transition-all duration-300 group-hover:w-full"></span>
+            </a>
+            <a href="#features" className="hover:text-white transition-colors relative group py-2">
+              Features
+              <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-indigo-500 transition-all duration-300 group-hover:w-full"></span>
+            </a>
+            <a href="#innovation" className="hover:text-white transition-colors relative group py-2">
+              Confidence Engine
+              <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-indigo-500 transition-all duration-300 group-hover:w-full"></span>
+            </a>
+            <a href="#ocr" className="hover:text-white transition-colors relative group py-2">
+              OCR Import
+              <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-indigo-500 transition-all duration-300 group-hover:w-full"></span>
+            </a>
+            <a href="#google" className="hover:text-white transition-colors relative group py-2">
+              Google Cloud
+              <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-indigo-500 transition-all duration-300 group-hover:w-full"></span>
+            </a>
           </nav>
 
           <div className="flex items-center gap-3">
             <button
               onClick={onLaunch}
-              className="px-4.5 py-1.5 text-xs font-bold rounded-full bg-white text-black hover:bg-slate-200 transition-all cursor-pointer shadow-sm shadow-white/10"
+              className="px-5 py-2 text-xs font-bold rounded-xl bg-white text-black hover:bg-slate-100 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer shadow-lg shadow-white/5 font-sans"
             >
               {isLoggedIn ? "Open Workspace →" : "Launch Saarthi"}
             </button>
@@ -256,8 +280,8 @@ export default function LandingPage({ onLaunch, isLoggedIn }: LandingPageProps) 
                   <button
                     key={idx}
                     onClick={() => setActiveCenterpieceStep(idx)}
-                    className={`flex flex-col items-center p-3 rounded-2xl transition-all cursor-pointer text-center space-y-1.5 ${
-                      isActive ? "bg-white/5 border border-white/10 shadow-lg" : "hover:bg-white/2"
+                    className={`flex flex-col items-center p-3 rounded-2xl transition-colors duration-200 cursor-pointer text-center space-y-1.5 border ${
+                      isActive ? "bg-white/5 border-white/10 shadow-lg" : "border-transparent hover:bg-white/2"
                     }`}
                   >
                     <div className={`p-1.5 rounded-lg ${isActive ? "bg-indigo-500/20 text-indigo-400" : "text-slate-500"}`}>
@@ -1039,17 +1063,24 @@ export default function LandingPage({ onLaunch, isLoggedIn }: LandingPageProps) 
       {/* WATCH DEMO WALKTHROUGH MODAL */}
       <AnimatePresence>
         {showDemoModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50"
-          >
+          <div className="fixed inset-0 flex items-center justify-center p-4 z-50">
+            {/* Backdrop blur layer sibling */}
             <motion.div
-              initial={{ scale: 0.95, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.95, y: 20 }}
-              className="bg-neutral-950 border border-white/10 rounded-3xl p-6 max-w-lg w-full space-y-4 shadow-2xl relative"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/80 backdrop-blur-md cursor-pointer"
+              onClick={() => {
+                setShowDemoModal(false);
+                setDemoStep(0);
+              }}
+            />
+            {/* Modal box (relative z-10 to stay crisp and above the blur) */}
+            <motion.div
+              initial={{ scale: 0.95, y: 20, opacity: 0 }}
+              animate={{ scale: 1, y: 0, opacity: 1 }}
+              exit={{ scale: 0.95, y: 20, opacity: 0 }}
+              className="relative z-10 bg-neutral-950 border border-white/10 rounded-3xl p-6 max-w-lg w-full space-y-4 shadow-2xl"
             >
               <div className="flex items-center justify-between border-b border-white/5 pb-3">
                 <div className="flex items-center gap-2">
@@ -1105,7 +1136,7 @@ export default function LandingPage({ onLaunch, isLoggedIn }: LandingPageProps) 
                 </div>
               </div>
             </motion.div>
-          </motion.div>
+          </div>
         )}
       </AnimatePresence>
 

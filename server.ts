@@ -11,7 +11,10 @@ import { plannerService } from "./src/services/plannerService.js";
 import { recoveryService } from "./src/services/recoveryService.js";
 import { calendarService } from "./src/services/calendarService.js";
 import { taskService } from "./src/services/taskService.js";
+import { telegramService } from "./src/services/telegramService.js";
 import { sendError, AppError } from "./src/services/errorHandler.js";
+import { dbData, saveDb } from "./src/services/localDb.js";
+import { generateContentWithRetryAndFallback } from "./src/services/geminiCall.js";
 
 dotenv.config();
 
@@ -75,6 +78,233 @@ app.post("/api/gemini/reminder-context", async (req, res) => {
     const aiClient = getAiClient(req);
     const contextAdvice = await plannerService.generateReminderContext(title, description, deadline, aiClient);
     return res.json(contextAdvice);
+  } catch (error: any) {
+    return sendError(res, error);
+  }
+});
+
+// --- Telegram Integration API Routes ---
+
+// 1c. Webhook endpoint called by Telegram when a user sends a message
+app.post("/api/telegram/webhook", async (req, res) => {
+  try {
+    await telegramService.handleUpdate(req.body);
+    return res.status(200).json({ ok: true });
+  } catch (error: any) {
+    console.error("Error handling Telegram update:", error);
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+// 1d. Generate a linking code (for settings panel) and register webhook dynamically
+app.post("/api/telegram/generate-code", async (req, res) => {
+  try {
+    const { userId } = req.body;
+    if (!userId) {
+      throw new AppError("userId is required to generate a linking code.", "BAD_REQUEST", 400);
+    }
+
+    // Capture actual protocol and host dynamically on user interaction to ensure the webhook is active
+    const protocol = "https";
+    const host = req.headers.host;
+    if (host) {
+      const customUrl = `${protocol}://${host}`;
+      console.log(`Dynamically registering Telegram webhook with current host: ${customUrl}`);
+      await telegramService.registerWebhook(customUrl).catch(err => {
+        console.warn("Failed dynamic webhook registration during code generation:", err);
+      });
+    }
+
+    const result = await telegramService.generateLinkingCode(userId);
+    return res.json(result);
+  } catch (error: any) {
+    return sendError(res, error);
+  }
+});
+
+// Diagnostic endpoint to check Telegram bot status
+app.get("/api/telegram/debug", async (req, res) => {
+  try {
+    const token = process.env.TELEGRAM_BOT_TOKEN;
+    const appUrl = process.env.APP_URL;
+    const protocol = "https";
+    const host = req.headers.host;
+    const rawInferredAppUrl = host ? `${protocol}://${host}` : undefined;
+    if (rawInferredAppUrl) {
+      await telegramService.registerWebhook(rawInferredAppUrl).catch(() => {});
+    }
+    const inferredAppUrl = telegramService.getLiveAppUrl();
+
+    const info: any = {
+      hasToken: !!token,
+      tokenLength: token ? token.length : 0,
+      tokenPrefix: token ? token.substring(0, 6) + "..." : "none",
+      appUrlEnv: appUrl || "not set",
+      inferredAppUrl,
+      nodeEnv: process.env.NODE_ENV,
+    };
+
+    if (token) {
+      // Test getMe
+      try {
+        const meRes = await fetch(`https://api.telegram.org/bot${token}/getMe`);
+        info.getMe = await meRes.json();
+      } catch (e: any) {
+        info.getMeError = e.message;
+      }
+
+      // Test getWebhookInfo
+      try {
+        const infoRes = await fetch(`https://api.telegram.org/bot${token}/getWebhookInfo`);
+        info.webhookInfo = await infoRes.json();
+      } catch (e: any) {
+        info.webhookInfoError = e.message;
+      }
+
+      // Register webhook using inferred URL
+      const expectedWebhook = `${inferredAppUrl}/api/telegram/webhook`;
+      info.expectedWebhook = expectedWebhook;
+      
+      const setUrl = `https://api.telegram.org/bot${token}/setWebhook?url=${encodeURIComponent(expectedWebhook)}`;
+      const setRes = await fetch(setUrl);
+      info.webhookRegisterResult = await setRes.json();
+    }
+
+    return res.json(info);
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+// 1e. Unlink Telegram account
+app.post("/api/telegram/unlink", async (req, res) => {
+  try {
+    const { userId } = req.body;
+    if (!userId) {
+      throw new AppError("userId is required to unlink.", "BAD_REQUEST", 400);
+    }
+    const success = await telegramService.unlinkAccount(userId);
+    return res.json({ success });
+  } catch (error: any) {
+    return sendError(res, error);
+  }
+});
+
+// 1ee. Sync client-side state (tasks & userSettings) with server local database cache
+app.post("/api/telegram/sync-state", (req, res) => {
+  try {
+    const { userId, tasks, userSettings } = req.body;
+    if (!userId) {
+      return res.status(400).json({ error: "userId is required" });
+    }
+
+    // Initialize map keys if not present
+    if (!dbData.userSettings) dbData.userSettings = {};
+    if (!dbData.tasks) dbData.tasks = {};
+
+    if (userSettings) {
+      dbData.userSettings[userId] = {
+        ...dbData.userSettings[userId],
+        ...userSettings
+      };
+    }
+
+    if (tasks && Array.isArray(tasks)) {
+      for (const task of tasks) {
+        if (task.id) {
+          dbData.tasks[task.id] = {
+            ...task,
+            userId
+          };
+        }
+      }
+    }
+
+    saveDb();
+    return res.json({ success: true });
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+// 1ef. Fetch current Telegram linking status and tasks cache for user
+app.get("/api/telegram/get-state", (req, res) => {
+  try {
+    const { userId } = req.query;
+    if (!userId) {
+      return res.status(400).json({ error: "userId is required" });
+    }
+
+    // Capture actual protocol and host dynamically on user interaction to ensure the webhook is active
+    const protocol = "https";
+    const host = req.headers.host;
+    if (host) {
+      const customUrl = `${protocol}://${host}`;
+      telegramService.registerWebhook(customUrl).catch(err => {
+        console.warn("Failed dynamic webhook registration during state fetch:", err);
+      });
+    }
+
+    const settings = dbData.userSettings ? (dbData.userSettings[String(userId)] || {}) : {};
+    
+    let linkingCode = null;
+    let linkingStatus = null;
+    let telegramChatId = settings.telegramChatId || null;
+    let telegramUsername = settings.telegramUsername || null;
+
+    if (dbData.telegramLinks) {
+      for (const [code, linkData] of Object.entries(dbData.telegramLinks)) {
+        if (linkData && linkData.userId === userId) {
+          linkingCode = code;
+          linkingStatus = linkData.status || "pending";
+          if (linkData.telegramChatId) {
+            telegramChatId = linkData.telegramChatId;
+            telegramUsername = linkData.telegramUsername;
+          }
+          break;
+        }
+      }
+    }
+
+    const tasksList = dbData.tasks 
+      ? Object.values(dbData.tasks).filter((t: any) => t && t.userId === userId)
+      : [];
+
+    return res.json({
+      telegramChatId,
+      telegramUsername,
+      linkingCode,
+      linkingStatus,
+      tasks: tasksList
+    });
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+// 1f. Trigger AI morning briefing on demand via UI
+app.post("/api/telegram/trigger-briefing", async (req, res) => {
+  try {
+    const { userId, chatId } = req.body;
+    if (!userId || !chatId) {
+      throw new AppError("userId and chatId are required to trigger morning briefings.", "BAD_REQUEST", 400);
+    }
+    await telegramService.handleBriefing(Number(chatId), userId);
+    return res.json({ success: true });
+  } catch (error: any) {
+    return sendError(res, error);
+  }
+});
+
+// 1g. Trigger Telegram recovery alert for high-risk task
+app.post("/api/telegram/trigger-alert", async (req, res) => {
+  try {
+    const { userId, task } = req.body;
+    if (!userId || !task) {
+      throw new AppError("userId and task are required to trigger a recovery alert.", "BAD_REQUEST", 400);
+    }
+    await telegramService.triggerRecoveryAlert(userId, task);
+    return res.json({ success: true });
   } catch (error: any) {
     return sendError(res, error);
   }
@@ -155,8 +385,8 @@ app.post("/api/gemini/chat", async (req, res) => {
 
     // Determine model to use
     // "Use gemini-3.1-pro-preview for complex tasks, Type.HIGH thinking mode. Do not set maxOutputTokens."
-    // "Use gemini-3.5-flash for general tasks, and gemini-3.1-flash-lite for tasks that should happen fast."
-    let selectedModel = "gemini-3.5-flash";
+    // "Use gemini-3.1-flash-lite for general tasks."
+    let selectedModel = "gemini-3.1-flash-lite";
     const isComplex = enableThinking || enableSearch || userMessage.length > 500;
     if (isComplex) {
       selectedModel = "gemini-3.1-pro-preview";
@@ -195,7 +425,7 @@ app.post("/api/gemini/chat", async (req, res) => {
       parts: [{ text: userMessage }],
     });
 
-    const response = await getAiClient(req).models.generateContent({
+    const response = await generateContentWithRetryAndFallback(getAiClient(req), {
       model: selectedModel,
       contents,
       config,
@@ -225,7 +455,7 @@ app.post("/api/gemini/tts", async (req, res) => {
     // Prebuilt options: 'Puck', 'Charon', 'Kore', 'Fenrir', 'Zephyr'
     const chosenVoice = voice || "Zephyr";
 
-    const response = await getAiClient(req).models.generateContent({
+    const response = await generateContentWithRetryAndFallback(getAiClient(req), {
       model: "gemini-3.1-flash-tts-preview",
       contents: [{ parts: [{ text: `Say this precisely: ${text}` }] }],
       config: {
@@ -479,5 +709,11 @@ async function setupVite() {
 setupVite().then(() => {
   server.listen(PORT, HOST, () => {
     console.log(`Server is running at http://${HOST}:${PORT}`);
+    // Start Telegram Bot Long Polling on startup (bypassing webhooks)
+    telegramService.startPolling().then(() => {
+      console.log("Telegram Long Polling service initialized successfully.");
+    }).catch((err) => {
+      console.error("Error starting Telegram Bot polling on server boot:", err);
+    });
   });
 });

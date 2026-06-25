@@ -1,6 +1,7 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { extractAndParseJson } from "./jsonUtils.js";
 import { AppError } from "./errorHandler.js";
+import { generateContentWithRetryAndFallback } from "./geminiCall.js";
 
 export interface SubtaskPlan {
   title: string;
@@ -64,8 +65,8 @@ export class PlannerService {
     };
 
     try {
-      const response = await aiClient.models.generateContent({
-        model: "gemini-3.5-flash",
+      const response = await generateContentWithRetryAndFallback(aiClient, {
+        model: "gemini-3.1-flash-lite",
         contents: commitment,
         config: {
           systemInstruction: "You are Saarthi, a highly strategic task planner. Decompose the user's task or academic/professional commitment into clear, action-oriented, distinct subtasks. Underestimate nothing: be realistic and time-box each subtask. Suggest 3 to 6 subtasks. Return the response strictly as a JSON object that matches the provided schema.",
@@ -181,8 +182,8 @@ export class PlannerService {
     try {
       const prompt = `Task Title: "${title}"\nTask Description: "${description || "None"}"\nTarget Deadline: "${deadline || "None"}"`;
 
-      const response = await aiClient.models.generateContent({
-        model: "gemini-3.5-flash",
+      const response = await generateContentWithRetryAndFallback(aiClient, {
+        model: "gemini-3.1-flash-lite",
         contents: prompt,
         config: {
           systemInstruction: `You are Saarthi, an expert productivity strategist. Analyze the user's upcoming task and generate precise, highly contextual, actionable execution details that go far beyond a standard passive reminder.
@@ -253,7 +254,7 @@ Return the response strictly as a JSON object matching the provided schema.`,
         text: "Examine the uploaded photo (e.g. syllabus, project board, whiteboard snapshot, planner entry). Identify and extract the main upcoming assignment, exam, task, deadline or commitment text in detail. Estimate standard effort parameters and list what it is. Return as a clean JSON object schema.",
       };
 
-      const response = await aiClient.models.generateContent({
+      const response = await generateContentWithRetryAndFallback(aiClient, {
         model: "gemini-3.1-pro-preview",
         contents: { parts: [imagePart, textPart] },
         config: {
@@ -319,8 +320,8 @@ For each extracted commitment, determine:
 Return your response strictly in the JSON schema provided.`,
       };
 
-      const response = await aiClient.models.generateContent({
-        model: "gemini-3.5-flash",
+      const response = await generateContentWithRetryAndFallback(aiClient, {
+        model: "gemini-3.1-flash-lite",
         contents: { parts: [imagePart, textPart] },
         config: {
           responseMimeType: "application/json",

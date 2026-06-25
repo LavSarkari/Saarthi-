@@ -1,6 +1,7 @@
 import { GoogleGenAI, Type, ThinkingLevel } from "@google/genai";
 import { extractAndParseJson } from "./jsonUtils.js";
 import { AppError } from "./errorHandler.js";
+import { generateContentWithRetryAndFallback } from "./geminiCall.js";
 
 export interface RecoveryPlan {
   isRecovered: boolean;
@@ -44,7 +45,7 @@ Pending Subtasks: [${subtasksLeftNames.join(", ")}]
 Generate a concentrated, realistic emergency recovery roadmap immediately. Be direct, authoritative, yet supportive. Provide specific compromises and actionable compromises of scope that the user can do to salvage this deadline, focused strictly on what is achievable in the remaining time.`;
 
       // Use gemini-3.1-pro-preview with high thinking for strategic advice
-      const response = await aiClient.models.generateContent({
+      const response = await generateContentWithRetryAndFallback(aiClient, {
         model: "gemini-3.1-pro-preview",
         contents: prompt,
         config: {
