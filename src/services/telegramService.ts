@@ -1595,6 +1595,7 @@ export class TelegramService {
       const data = settingsSnap.data()!;
       const chatId = data.telegramChatId;
       if (!chatId) return;
+      if (data.telegramAlertsEnabled === false) return;
 
       const risk = computeRiskScore(task);
       

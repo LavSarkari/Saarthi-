@@ -33,6 +33,9 @@ interface SettingsModalProps {
   isGeneratingTelegramCode: boolean;
   onGenerateLinkCode: () => Promise<void> | void;
   triggerToast: (msg: string) => void;
+  telegramAlertsEnabled: boolean;
+  telegramAlertSlots: string[];
+  onSaveTelegramAlertSettings: (enabled: boolean, slots: string[]) => Promise<void> | void;
 }
 
 export default function SettingsModal({
@@ -50,8 +53,21 @@ export default function SettingsModal({
   telegramCode,
   isGeneratingTelegramCode,
   onGenerateLinkCode,
-  triggerToast
+  triggerToast,
+  telegramAlertsEnabled,
+  telegramAlertSlots,
+  onSaveTelegramAlertSettings
 }: SettingsModalProps) {
+  const [localTgEnabled, setLocalTgEnabled] = React.useState(telegramAlertsEnabled);
+  const [localTgSlots, setLocalTgSlots] = React.useState<string[]>(telegramAlertSlots);
+
+  React.useEffect(() => {
+    if (isOpen) {
+      setLocalTgEnabled(telegramAlertsEnabled);
+      setLocalTgSlots(telegramAlertSlots);
+    }
+  }, [isOpen, telegramAlertsEnabled, telegramAlertSlots]);
+
   if (!isOpen) return null;
 
   return (
@@ -214,6 +230,65 @@ export default function SettingsModal({
                       Your Saarthi account is connected to your Telegram Bot! You will receive instant **Critical Rescue Alerts** on Telegram when deadlines compress, and can query commands or dictate voice notes.
                     </p>
 
+                    <div className="space-y-4 pt-2 border-t border-zinc-100">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[11px] font-bold text-zinc-800 uppercase tracking-wide">
+                          Critical Risk Push Alerts
+                        </label>
+                        <button
+                          onClick={() => setLocalTgEnabled(!localTgEnabled)}
+                          className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                            localTgEnabled ? 'bg-emerald-500' : 'bg-zinc-300'
+                          }`}
+                        >
+                          <span
+                            className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+                              localTgEnabled ? 'translate-x-4' : 'translate-x-1'
+                            } ${localTgEnabled ? 'ml-0.5' : ''}`}
+                          />
+                        </button>
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">
+                          Daily Digest Slots (Max 3)
+                        </label>
+                        <p className="text-[10px] text-zinc-400 mb-2">Configure specific times to receive scheduled summary briefings of your active tasks and risks.</p>
+                        {localTgSlots.map((slot, idx) => (
+                          <div key={idx} className="flex items-center gap-2">
+                            <input
+                              type="time"
+                              value={slot}
+                              onChange={(e) => {
+                                const newSlots = [...localTgSlots];
+                                newSlots[idx] = e.target.value;
+                                setLocalTgSlots(newSlots);
+                              }}
+                              className="input-primary font-mono py-1.5 px-2 text-xs w-full max-w-[120px]"
+                            />
+                            <button
+                              onClick={() => {
+                                const newSlots = [...localTgSlots];
+                                newSlots.splice(idx, 1);
+                                setLocalTgSlots(newSlots);
+                              }}
+                              className="p-1.5 text-zinc-400 hover:text-rose-500 bg-zinc-100 rounded-lg transition-colors cursor-pointer"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        ))}
+                        {localTgSlots.length < 3 && (
+                          <button
+                            onClick={() => setLocalTgSlots([...localTgSlots, "09:00"])}
+                            className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 transition-colors flex items-center gap-1 mt-1 cursor-pointer"
+                          >
+                            + Add Time Slot
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
                     <div className="p-4 bg-zinc-50 border border-zinc-200/80 rounded-xl space-y-3">
                       <h4 className="text-[10px] font-bold text-zinc-800 uppercase tracking-wide font-mono flex items-center gap-1.5">
                         <Send className="w-3.5 h-3.5 text-zinc-600" />
@@ -230,12 +305,21 @@ export default function SettingsModal({
                       </button>
                     </div>
 
-                    <div className="flex justify-end pt-2">
+                    <div className="flex justify-end gap-2 pt-2">
                       <button
                         onClick={onClose}
-                        className="btn-secondary px-5 py-2.5 bg-zinc-100 border-transparent hover:bg-zinc-200 text-zinc-800 font-bold"
+                        className="btn-secondary px-4 py-2"
                       >
-                        Done
+                        Cancel
+                      </button>
+                      <button
+                        onClick={() => {
+                          onSaveTelegramAlertSettings(localTgEnabled, localTgSlots);
+                          onClose();
+                        }}
+                        className="btn-primary px-5 py-2 text-xs"
+                      >
+                        Save Preferences
                       </button>
                     </div>
                   </div>

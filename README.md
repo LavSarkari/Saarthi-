@@ -49,6 +49,9 @@ Feeling overwhelmed? Engage in low-latency, real-time voice consultations with a
 ### 📸 7. Autonomous Task Planning & Execution (Vision OCR)
 Don't waste time typing out lengthy syllabi or copy-pasting homework guidelines. Snap a photo of a document or syllabus, and the **Gemini Vision OCR Engine** will automatically extract deadlines, estimate workloads, and autonomously plan your entire month.
 
+### 📱 8. Telegram Companion Bot
+Saarthi isn't confined to a browser tab—it's a whole ecosystem. The dedicated **Telegram Companion Bot** provides high-priority, real-time alerts when tasks reach critical risk levels. Engage directly via chat to receive rapid context, quick-start templates, and immediate execution steps without ever opening the web app.
+
 ---
 
 ## 🚀 Installation & Local Development

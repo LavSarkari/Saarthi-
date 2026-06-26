@@ -235,6 +235,8 @@ export default function App() {
   // Telegram states
   const [telegramChatId, setTelegramChatId] = useState<string | null>(null);
   const [telegramUsername, setTelegramUsername] = useState<string | null>(null);
+  const [telegramAlertsEnabled, setTelegramAlertsEnabled] = useState(true);
+  const [telegramAlertSlots, setTelegramAlertSlots] = useState<string[]>(["09:00"]);
   const [telegramCode, setTelegramCode] = useState<string | null>(null);
   const [telegramCodeExpires, setTelegramCodeExpires] = useState<string | null>(null);
   const [isGeneratingTelegramCode, setIsGeneratingTelegramCode] = useState<boolean>(false);
@@ -456,6 +458,12 @@ export default function App() {
           } else {
             setTelegramUsername(null);
           }
+          if (data.telegramAlertsEnabled !== undefined) {
+            setTelegramAlertsEnabled(data.telegramAlertsEnabled);
+          }
+          if (data.telegramAlertSlots) {
+            setTelegramAlertSlots(data.telegramAlertSlots);
+          }
         }
       }
     }, (error) => {
@@ -476,11 +484,13 @@ export default function App() {
 
       // Transition to critical!
       if (prevZone && prevZone !== "critical" && nextZone === "critical") {
-        fetch("/api/telegram/trigger-alert", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ userId: user.uid, task }),
-        }).catch((err) => console.warn("Failed to dispatch Telegram recovery alert:", err));
+        if (telegramAlertsEnabled) {
+          fetch("/api/telegram/trigger-alert", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ userId: user.uid, task }),
+          }).catch((err) => console.warn("Failed to dispatch Telegram recovery alert:", err));
+        }
       }
 
       // Track the current zone
@@ -503,7 +513,9 @@ export default function App() {
             userSettings: {
               telegramChatId,
               telegramUsername,
-              geminiApiKey: userApiKey
+              geminiApiKey: userApiKey,
+              telegramAlertsEnabled,
+              telegramAlertSlots
             }
           })
         });
@@ -617,6 +629,22 @@ export default function App() {
     } catch (err: any) {
       console.error("Error saving settings:", err);
       triggerToast(`Fails to save settings: ${err.message}`);
+    }
+  };
+
+  const handleSaveTelegramSettings = async (enabled: boolean, slots: string[]) => {
+    if (!user || user.isSimulated) return;
+    try {
+      const docRef = doc(db, "userSettings", user.uid);
+      await setDoc(docRef, {
+        telegramAlertsEnabled: enabled,
+        telegramAlertSlots: slots,
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+      triggerToast("Telegram alert settings saved!");
+    } catch (err: any) {
+      console.error("Error saving Telegram settings:", err);
+      triggerToast("Failed to save Telegram settings");
     }
   };
 
@@ -3435,6 +3463,9 @@ export default function App() {
         isGeneratingTelegramCode={isGeneratingTelegramCode}
         onGenerateLinkCode={handleGenerateLinkCode}
         triggerToast={triggerToast}
+        telegramAlertsEnabled={telegramAlertsEnabled}
+        telegramAlertSlots={telegramAlertSlots}
+        onSaveTelegramAlertSettings={handleSaveTelegramSettings}
       />
 
       <OCRReviewModal

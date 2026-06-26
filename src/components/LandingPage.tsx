@@ -21,7 +21,8 @@ import {
   Settings,
   Flame,
   Zap,
-  RotateCcw
+  RotateCcw,
+  MessageCircle
 } from "lucide-react";
 
 interface LandingPageProps {
@@ -727,6 +728,17 @@ export default function LandingPage({ onLaunch, isLoggedIn }: LandingPageProps) 
               <h4 className="text-sm font-bold text-white tracking-tight">Voice-Enabled Assistance & Context Reminders</h4>
               <p className="text-xs text-slate-400 leading-relaxed">
                 Engage in real-time voice consultations with tactical AI coaches. Get context-aware reminders that adapt to your progress and stress levels.
+              </p>
+            </div>
+
+            {/* Feature 7 */}
+            <div className="bg-neutral-950/40 border border-white/5 rounded-3xl p-6 space-y-4 hover:border-indigo-500/20 hover:bg-neutral-950/80 transition-all group md:col-span-2 lg:col-span-1">
+              <div className="p-2.5 bg-cyan-500/10 text-cyan-400 rounded-2xl w-fit">
+                <MessageCircle className="w-5 h-5" />
+              </div>
+              <h4 className="text-sm font-bold text-white tracking-tight">Telegram Companion Bot</h4>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Get high-priority alerts via a dedicated Telegram bot. Receive quick-start templates and immediate execution steps without opening the app.
               </p>
             </div>
           </div>
