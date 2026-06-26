@@ -51,6 +51,29 @@ Don't waste time typing out lengthy syllabi or copy-pasting homework guidelines.
 
 ---
 
+## 🚀 Installation & Local Development
+
+1. **Clone the repository:**
+   ```bash
+   git clone <repository_url>
+   cd saarthi
+   ```
+2. **Install dependencies:**
+   ```bash
+   npm install
+   ```
+3. **Set up Environment Variables:**
+   Copy `.env.example` to `.env` and configure your API keys (e.g., `GEMINI_API_KEY`).
+4. **Configure Firebase:**
+   Ensure `firebase-applet-config.json` points to your project.
+5. **Start Development Server:**
+   ```bash
+   npm run dev
+   ```
+   The application will start in development mode, typically on port 3000.
+
+---
+
 ## 🏗️ Technical Architecture & Stack
 
 We built Saarthi to be lightning-fast, highly scalable, and completely seamlessly integrated with Google's ecosystem.
