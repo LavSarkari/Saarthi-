@@ -236,15 +236,15 @@ export default function LandingPage({ onLaunch, isLoggedIn }: LandingPageProps) 
 
         {/* Headline */}
         <h1 className="text-4xl md:text-7xl font-bold font-display tracking-tight text-white max-w-4xl mx-auto leading-[1.1]">
-          Stop Missing Deadlines. <br />
+          The Last-Minute <br />
           <span className="bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 via-purple-300 to-emerald-400">
-            Start Finishing Commitments.
+            Life Saver.
           </span>
         </h1>
 
         {/* Subheadline */}
         <p className="text-slate-400 text-sm md:text-lg max-w-2xl mx-auto leading-relaxed">
-          Saarthi predicts execution risk, generates proactive tactical recovery plans, and guides you from raw intention to completion. Built on Google Gemini and Cloud architecture.
+          Saarthi is an AI-powered productivity companion that proactively assists you in planning, prioritizing, and completing tasks before deadlines are missed.
         </p>
 
         {/* CTAs */}
@@ -669,9 +669,9 @@ export default function LandingPage({ onLaunch, isLoggedIn }: LandingPageProps) 
               <div className="p-2.5 bg-indigo-500/10 text-indigo-400 rounded-2xl w-fit">
                 <Layers className="w-5 h-5" />
               </div>
-              <h4 className="text-sm font-bold text-white tracking-tight">1. AI Task Decomposition</h4>
+              <h4 className="text-sm font-bold text-white tracking-tight">AI-Powered Scheduling Assistance</h4>
               <p className="text-xs text-slate-400 leading-relaxed">
-                Breaks raw qualitative goals into logical subtasks. Automatically scales estimates using the Gemini reasoning model.
+                Breaks raw qualitative goals into logical subtasks. Automatically scales estimates using the Gemini reasoning model to fit your schedule.
               </p>
             </div>
 
@@ -680,9 +680,9 @@ export default function LandingPage({ onLaunch, isLoggedIn }: LandingPageProps) 
               <div className="p-2.5 bg-purple-500/10 text-purple-400 rounded-2xl w-fit">
                 <TrendingUp className="w-5 h-5" />
               </div>
-              <h4 className="text-sm font-bold text-white tracking-tight">2. Completion Confidence Engine</h4>
+              <h4 className="text-sm font-bold text-white tracking-tight">Intelligent Task Prioritization</h4>
               <p className="text-xs text-slate-400 leading-relaxed">
-                Continually computes an active score based on deadlines, remaining workload, and cognitive factors.
+                Continually computes an active score based on deadlines, remaining workload, and cognitive factors to dynamically prioritize critical tasks.
               </p>
             </div>
 
@@ -691,9 +691,9 @@ export default function LandingPage({ onLaunch, isLoggedIn }: LandingPageProps) 
               <div className="p-2.5 bg-rose-500/10 text-rose-400 rounded-2xl w-fit">
                 <ShieldCheck className="w-5 h-5" />
               </div>
-              <h4 className="text-sm font-bold text-white tracking-tight">3. Strategic Recovery Plans</h4>
+              <h4 className="text-sm font-bold text-white tracking-tight">Personalized Productivity Recommendations</h4>
               <p className="text-xs text-slate-400 leading-relaxed">
-                When a conflict is detected, click one button to compile immediate tactical rescue strategies.
+                When a conflict is detected, click one button to compile immediate tactical rescue strategies and actionable compromises.
               </p>
             </div>
 
@@ -702,9 +702,9 @@ export default function LandingPage({ onLaunch, isLoggedIn }: LandingPageProps) 
               <div className="p-2.5 bg-amber-500/10 text-amber-400 rounded-2xl w-fit">
                 <Camera className="w-5 h-5" />
               </div>
-              <h4 className="text-sm font-bold text-white tracking-tight">4. OCR Commitment Import</h4>
+              <h4 className="text-sm font-bold text-white tracking-tight">Autonomous Task Planning & Execution</h4>
               <p className="text-xs text-slate-400 leading-relaxed">
-                Scan multiple syllabus deadlines or exam timetables directly from images using Gemini Vision for structured import.
+                Scan multiple syllabus deadlines directly from images using Gemini Vision for structured import and fully autonomous scheduling.
               </p>
             </div>
 
@@ -713,9 +713,9 @@ export default function LandingPage({ onLaunch, isLoggedIn }: LandingPageProps) 
               <div className="p-2.5 bg-emerald-500/10 text-emerald-400 rounded-2xl w-fit">
                 <Calendar className="w-5 h-5" />
               </div>
-              <h4 className="text-sm font-bold text-white tracking-tight">5. Google Workspace Sync</h4>
+              <h4 className="text-sm font-bold text-white tracking-tight">Calendar Integration & Goal Tracking</h4>
               <p className="text-xs text-slate-400 leading-relaxed">
-                Real OAuth linkage connects your active tasks to Google Calendar and Google Tasks automatically.
+                Real OAuth linkage connects your active tasks to Google Calendar and Google Tasks, creating unified goal tracking and accountability.
               </p>
             </div>
 
@@ -724,9 +724,9 @@ export default function LandingPage({ onLaunch, isLoggedIn }: LandingPageProps) 
               <div className="p-2.5 bg-blue-500/10 text-blue-400 rounded-2xl w-fit">
                 <Mic className="w-5 h-5" />
               </div>
-              <h4 className="text-sm font-bold text-white tracking-tight">6. Voice-Powered Live Assistance</h4>
+              <h4 className="text-sm font-bold text-white tracking-tight">Voice-Enabled Assistance & Context Reminders</h4>
               <p className="text-xs text-slate-400 leading-relaxed">
-                Engage in low-latency real-time voice consultations with tactical AI coaches using Gemini Live WebSockets.
+                Engage in real-time voice consultations with tactical AI coaches. Get context-aware reminders that adapt to your progress and stress levels.
               </p>
             </div>
           </div>
