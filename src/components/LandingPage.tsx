@@ -160,7 +160,7 @@ export default function LandingPage({ onLaunch, isLoggedIn }: LandingPageProps) 
   ];
 
   return (
-    <div className="min-h-screen bg-black text-slate-100 font-sans selection:bg-indigo-600 selection:text-white relative overflow-hidden">
+    <main className="min-h-screen bg-black text-slate-100 font-sans selection:bg-indigo-600 selection:text-white relative overflow-hidden">
       
       {/* Dynamic Aurora Atmospheric Glow Backgrounds */}
       <div className="absolute top-0 left-1/4 w-[800px] h-[500px] rounded-full bg-gradient-to-tr from-indigo-600/10 to-transparent blur-[160px] pointer-events-none" />
@@ -642,6 +642,9 @@ export default function LandingPage({ onLaunch, isLoggedIn }: LandingPageProps) 
                 <button
                   onClick={() => setSimRecoveryActive(!simRecoveryActive)}
                   className={`w-12 h-6.5 rounded-full p-1 transition-colors duration-300 ${simRecoveryActive ? "bg-emerald-500" : "bg-neutral-800"}`}
+                  aria-label="Toggle Strategic Compromise Recovery Plan"
+                  role="switch"
+                  aria-checked={simRecoveryActive}
                 >
                   <div className={`bg-white w-4.5 h-4.5 rounded-full shadow-md transform transition-transform duration-300 ${simRecoveryActive ? "translate-x-5" : ""}`} />
                 </button>
@@ -1152,6 +1155,6 @@ export default function LandingPage({ onLaunch, isLoggedIn }: LandingPageProps) 
         )}
       </AnimatePresence>
 
-    </div>
+    </main>
   );
 }

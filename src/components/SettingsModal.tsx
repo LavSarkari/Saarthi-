@@ -240,6 +240,9 @@ export default function SettingsModal({
                           className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
                             localTgEnabled ? 'bg-emerald-500' : 'bg-zinc-300'
                           }`}
+                          aria-label="Toggle Critical Risk Push Alerts"
+                          role="switch"
+                          aria-checked={localTgEnabled}
                         >
                           <span
                             className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
@@ -273,6 +276,7 @@ export default function SettingsModal({
                                 setLocalTgSlots(newSlots);
                               }}
                               className="p-1.5 text-zinc-400 hover:text-rose-500 bg-zinc-100 rounded-lg transition-colors cursor-pointer"
+                              aria-label="Remove time slot"
                             >
                               <X className="w-3 h-3" />
                             </button>
