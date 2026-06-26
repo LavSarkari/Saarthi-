@@ -89,10 +89,10 @@ export default function SyllabusAnalyzer({
       <div className="space-y-1">
         <h3 className="text-sm font-bold font-display text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
           <Camera className="w-4 h-4 text-zinc-800 dark:text-zinc-200" />
-          Smart File & Ingestion Engine
+          Document Scanner
         </h3>
         <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
-          Upload syllabi, exam timetables, assignment handouts, or task captures to let Saarthi decompose them automatically.
+          Upload a syllabus, exam schedule, timetable, or course handout to let Saarthi organize milestones for you.
         </p>
       </div>
 
@@ -171,7 +171,7 @@ export default function SyllabusAnalyzer({
               ) : (
                 <Search className="w-4 h-4 text-zinc-600 dark:text-zinc-400" />
               )}
-              <span>Scan Syllabus Context</span>
+              <span>Deconstruct Syllabus</span>
             </button>
 
             {/* OCR Extract Multi-commitments */}
@@ -185,7 +185,7 @@ export default function SyllabusAnalyzer({
               ) : (
                 <Sparkles className="w-4 h-4" />
               )}
-              <span>OCR Scan Task-List</span>
+              <span>Extract Checklist Tasks</span>
             </button>
           </div>
         </div>

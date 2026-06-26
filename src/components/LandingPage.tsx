@@ -1063,7 +1063,7 @@ export default function LandingPage({ onLaunch, isLoggedIn }: LandingPageProps) 
       {/* WATCH DEMO WALKTHROUGH MODAL */}
       <AnimatePresence>
         {showDemoModal && (
-          <div className="fixed inset-0 flex items-center justify-center p-4 z-50">
+          <div className="fixed inset-0 flex items-center justify-center p-4 z-[200]">
             {/* Backdrop blur layer sibling */}
             <motion.div
               initial={{ opacity: 0 }}

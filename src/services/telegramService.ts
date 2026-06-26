@@ -180,10 +180,24 @@ export class TelegramService {
   /**
    * Helper to send message to Telegram
    */
-  async sendMessage(chatId: number | string, text: string, options: any = {}): Promise<boolean> {
+
+  async sendChatAction(chatId: number | string, action: string = "typing") {
+    if (!this.token) return;
+    const url = `https://api.telegram.org/bot${this.token}/sendChatAction`;
+    try {
+      await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chat_id: chatId, action })
+      });
+    } catch (e) {}
+  }
+
+  
+  async sendMessage(chatId: number | string, text: string, options: any = {}): Promise<any> {
     if (!this.token) {
       console.warn("TELEGRAM_BOT_TOKEN is missing. Cannot send message.");
-      return false;
+      return null;
     }
 
     const url = `https://api.telegram.org/bot${this.token}/sendMessage`;
@@ -201,12 +215,13 @@ export class TelegramService {
         body: JSON.stringify(payload),
       });
       const data: any = await response.json();
-      return !!data.ok;
+      return data.ok ? data.result : null;
     } catch (err) {
       console.error("Error sending Telegram message:", err);
-      return false;
+      return null;
     }
   }
+
 
   /**
    * Find linked Saarthi user by Telegram Chat ID
@@ -317,12 +332,13 @@ export class TelegramService {
   /**
    * Get the persistent Reply Keyboard for Saarthi Menu
    */
-  private getMenuKeyboard() {
+    private getMenuKeyboard() {
     return {
       keyboard: [
-        [{ text: "📋 My Tasks" }, { text: "📅 Today" }],
-        [{ text: "📊 Execution Health" }, { text: "🛟 Recovery Center" }],
-        [{ text: "🤖 AI Assistant" }, { text: "⚙️ Settings" }, { text: "❓ Help" }]
+        [{ text: "🏠 Home" }, { text: "📋 Tasks" }],
+        [{ text: "📅 Today" }, { text: "📈 Health" }],
+        [{ text: "🛟 Recovery" }, { text: "🤖 Ask Saarthi" }],
+        [{ text: "⚙️ Settings" }, { text: "❓ Help" }]
       ],
       resize_keyboard: true,
       persistent: true
@@ -352,28 +368,26 @@ export class TelegramService {
     // Check if the user is linked
     const userId = await this.getUserByChatId(chatId);
 
+    
     // 1. Check if the text matches a persistent Reply Keyboard button
     if (userId) {
-      if (text === "📋 My Tasks") {
+      if (text === "🏠 Home") {
+        await this.handleHome(chatId, userId, username);
+        return;
+      } else if (text === "📋 Tasks") {
         await this.handleTasks(chatId, userId);
         return;
       } else if (text === "📅 Today") {
         await this.handleToday(chatId, userId);
         return;
-      } else if (text === "📊 Execution Health") {
+      } else if (text === "📈 Health") {
         await this.handleStatus(chatId, userId);
         return;
-      } else if (text === "🛟 Recovery Center") {
+      } else if (text === "🛟 Recovery") {
         await this.handleRecovery(chatId, userId);
         return;
-      } else if (text === "🤖 AI Assistant") {
-        await this.sendMessage(chatId, `🤖 *Saarthi Premium AI Assistant* 🤖\n\nI am listening in plain text! Feel free to talk to me naturally. You don't need to memorize slash commands anymore.\n\n*Try sending:*\n• _"I finished DBMS Unit 3 study"_\n• _"Snooze my ML project by 2 days"_\n• _"What should I study next?"_\n• _"I'm feeling super exhausted today"_\n• _"Can you explain normal forms in DBMS?"_`);
-        return;
-      } else if (text === "⚙️ Settings") {
-        await this.handleSettings(chatId, userId);
-        return;
-      } else if (text === "❓ Help") {
-        await this.handleHelp(chatId, userId);
+      } else if (text === "🤖 Ask Saarthi") {
+        await this.sendMessage(chatId, `🤖 *Saarthi Premium AI Assistant*\n\nI am listening in plain text! Feel free to talk to me naturally. You don't need to memorize slash commands anymore.\n\n*Try sending:*\n• _"I finished DBMS Unit 3 study"_\n• _"Snooze my ML project by 2 days"_\n• _"What should I study next?"_\n• _"I'm feeling super exhausted today"_`);
         return;
       }
     }
@@ -386,18 +400,15 @@ export class TelegramService {
       if (!code) {
         if (userId) {
           // Send beautiful linked home greeting
-          await this.sendMessage(
-            chatId,
-            `✨ *Namaste, ${username}!* Welcome back to Saarthi, your premium execution companion. ✨\n\nUse the persistent menu keyboard below to explore tasks, health status, settings, or talk directly to the AI Assistant.`,
-            { reply_markup: this.getMenuKeyboard() }
-          );
+          await this.sendMessage(chatId, "Welcome back!", { reply_markup: this.getMenuKeyboard() }).catch(() => {});
+          await this.handleHome(chatId, userId, username);
         } else {
           // Launch interactive premium onboarding flow
-          const welcomeText = `✨ *Welcome to Saarthi!* ✨\n\nI am your intelligent conversational productivity companion native to Telegram. I work alongside your Saarthi dashboard to track milestones, predict deadline risk velocity, and provide recovery plans.\n\nLet's get you set up in less than 30 seconds!`;
+          const welcomeText = `✨ *Welcome.*\n\nI'm Saarthi, your personal execution companion.\n\nI help you track milestones, protect your time, and rescue slipping deadlines.`;
           await this.sendMessage(chatId, welcomeText, {
             reply_markup: {
               inline_keyboard: [
-                [{ text: "Begin Onboarding ➔", callback_data: "onboard_slide_1" }]
+                [{ text: "Connect Account ➔", callback_data: "onboard_slide_1" }]
               ]
             }
           });
@@ -434,10 +445,22 @@ export class TelegramService {
     } else if (text === "/briefing") {
       await this.handleBriefing(chatId, userId);
     } else {
-      // 4. Default to premium conversational NLP processing (AI Companion Mode)
-      await this.handleExecutionUpdate(chatId, userId, text);
+      // 3.5 Intercept "I'm stuck" / "help" / "overwhelmed"
+      const lowerText = text.toLowerCase();
+      if (lowerText.includes("stuck") || lowerText.includes("overwhelmed") || lowerText.includes("help") || lowerText.includes("tired")) {
+        const inline_keyboard = [
+          [{ text: "🐞 Bug", callback_data: "tasks_list" }],
+          [{ text: "🧠 Can't figure it out", callback_data: "tasks_list" }],
+          [{ text: "😵 Overwhelmed", callback_data: "menu_recovery" }],
+          [{ text: "📚 Don't know what to do", callback_data: "tasks_list" }]
+        ];
+        await this.sendMessage(chatId, `💛 Happens to everyone.\n\nWhere are you stuck?`, { reply_markup: { inline_keyboard } });
+        return;
+      }
+      await this.handleGenericMessage(chatId, userId, text);
     }
   }
+
 
   /**
    * Handle Telegram callback queries from inline buttons
@@ -467,55 +490,13 @@ export class TelegramService {
     }
 
     try {
-      if (data.startsWith("onboard_")) {
-        await this.handleOnboardingCallback(chatId, messageId, data, callbackId);
-      } else if (data === "tasks_list") {
-        await this.answerCallbackQuery(callbackId, "Fetching active commitments...");
+      if (data === "tasks_list") {
+        await this.answerCallbackQuery(callbackId);
         await this.handleTasks(chatId, userId, messageId);
-      } else if (data.startsWith("task_details:")) {
-        const taskId = data.split(":")[1];
-        await this.answerCallbackQuery(callbackId, "Opening task detail card...");
-        await this.showRichTaskCard(chatId, userId, taskId, messageId);
-      } else if (data.startsWith("milestones_list:")) {
-        const taskId = data.split(":")[1];
-        await this.answerCallbackQuery(callbackId, "Fetching milestones...");
-        await this.showMilestonesListCard(chatId, userId, taskId, messageId);
-      } else if (data.startsWith("toggle_subtask:")) {
-        const [_, taskId, subtaskId] = data.split(":");
-        await this.answerCallbackQuery(callbackId, "Toggling milestone status...");
-        await this.toggleSubtaskStatus(chatId, userId, taskId, subtaskId, messageId);
-      } else if (data.startsWith("task_snooze:")) {
-        const taskId = data.split(":")[1];
-        await this.answerCallbackQuery(callbackId, "Opening snooze menu...");
-        await this.showSnoozeMenu(chatId, userId, taskId, messageId);
-      } else if (data.startsWith("task_snooze_act:")) {
-        const [_, __, taskId, daysStr] = data.split(":");
-        const days = parseInt(daysStr, 10);
-        await this.answerCallbackQuery(callbackId, `Snoozing task by ${days} days...`);
-        await this.executeSnoozeTask(chatId, userId, taskId, days, messageId);
-      } else if (data.startsWith("task_recovery:")) {
-        const taskId = data.split(":")[1];
-        await this.answerCallbackQuery(callbackId, "Generating recovery plan...");
-        await this.executeTaskRecovery(chatId, userId, taskId, messageId);
-      } else if (data.startsWith("apply_recovery_act:")) {
-        const taskId = data.split(":")[1];
-        await this.answerCallbackQuery(callbackId, "Recovery plan applied successfully!");
-        await this.applyRecoveryPlan(chatId, userId, taskId, messageId);
-      } else if (data.startsWith("toggle_setting:")) {
-        const field = data.split(":")[1];
-        await this.toggleUserSetting(chatId, userId, field, callbackId, messageId);
-      } else if (data === "config_notifications") {
+      } else if (data === "menu_home") {
         await this.answerCallbackQuery(callbackId);
-        await this.showNotificationConfig(chatId, userId, messageId);
-      } else if (data.startsWith("set_notifications:")) {
-        const level = data.split(":")[1];
-        await this.updateNotificationLevel(chatId, userId, level, callbackId, messageId);
-      } else if (data === "config_lang") {
-        await this.answerCallbackQuery(callbackId);
-        await this.showLanguageConfig(chatId, userId, messageId);
-      } else if (data.startsWith("set_lang:")) {
-        const lang = data.split(":")[1];
-        await this.updateLanguageSetting(chatId, userId, lang, callbackId, messageId);
+        const username = callback.from?.username || callback.from?.first_name || "User";
+        await this.handleHome(chatId, userId, username, messageId);
       } else if (data === "menu_today") {
         await this.answerCallbackQuery(callbackId);
         await this.handleToday(chatId, userId, messageId);
@@ -533,78 +514,77 @@ export class TelegramService {
       } else if (data === "help_index") {
         await this.answerCallbackQuery(callbackId);
         await this.handleHelp(chatId, userId, messageId);
+      } else if (data.startsWith("task_details:")) {
+        const taskId = data.split(":")[1];
+        await this.answerCallbackQuery(callbackId);
+        await this.showRichTaskCard(chatId, userId, taskId, messageId);
+      } else if (data.startsWith("task_milestones:")) {
+        const taskId = data.split(":")[1];
+        await this.answerCallbackQuery(callbackId);
+        await this.showMilestonesListCard(chatId, userId, taskId, messageId);
+      } else if (data.startsWith("task_recovery:")) {
+        const taskId = data.split(":")[1];
+        await this.answerCallbackQuery(callbackId);
+        await this.executeTaskRecovery(chatId, userId, taskId, messageId);
+      } else if (data.startsWith("task_snooze_menu:")) {
+        const taskId = data.split(":")[1];
+        await this.answerCallbackQuery(callbackId);
+        await this.showSnoozeMenu(chatId, userId, taskId, messageId);
+      } else if (data.startsWith("task_snooze:")) {
+        const parts = data.split(":");
+        const taskId = parts[1];
+        const days = parseInt(parts[2] || "0", 10);
+        await this.answerCallbackQuery(callbackId);
+        if (days > 0) {
+          await this.executeSnoozeTask(chatId, userId, taskId, days, messageId);
+        } else {
+          await this.showSnoozeMenu(chatId, userId, taskId, messageId);
+        }
+      } else if (data.startsWith("toggle_subtask:")) {
+        const parts = data.split(":");
+        const taskId = parts[1];
+        const subtaskId = parts[2];
+        await this.answerCallbackQuery(callbackId);
+        await this.toggleSubtaskStatus(chatId, userId, taskId, subtaskId, messageId);
+      } else if (data.startsWith("toggle_setting:")) {
+        const field = data.split(":")[1];
+        await this.toggleUserSetting(chatId, userId, field, callbackId, messageId);
+      } else if (data === "config_notifications" || data === "config_lang") {
+        await this.answerCallbackQuery(callbackId, "Please use the web dashboard to configure this setting.");
       } else {
         await this.answerCallbackQuery(callbackId, "Unknown callback action.");
       }
     } catch (err: any) {
       console.error("Error handling callback query:", err);
-      await this.answerCallbackQuery(callbackId, `Error: ${err.message}`);
+      await this.answerCallbackQuery(callbackId, "Error: " + err.message);
     }
   }
 
-  /**
-   * Onboarding slide processor
-   */
   private async handleOnboardingCallback(chatId: number, messageId: number, data: string, callbackId: string) {
     const appUrl = this.getLiveAppUrl();
     await this.answerCallbackQuery(callbackId);
 
     if (data === "onboard_slide_0") {
-      const text = `✨ *Welcome to Saarthi!* ✨\n\nI am your intelligent conversational productivity companion native to Telegram. I work alongside your Saarthi dashboard to track milestones, predict deadline risk velocity, and provide recovery plans.\n\nLet's get you set up in less than 30 seconds!`;
+      const text = `✨ *Welcome.*\n\nI'm Saarthi, your personal execution companion.\n\nI help you track milestones, protect your time, and rescue slipping deadlines.`;
       await this.editMessageText(chatId, messageId, text, {
         reply_markup: {
           inline_keyboard: [
-            [{ text: "Begin Onboarding ➔", callback_data: "onboard_slide_1" }]
+            [{ text: "Connect Account ➔", callback_data: "onboard_slide_1" }]
           ]
         }
       });
     } else if (data === "onboard_slide_1") {
-      const text = `🔑 *Step 1: Link Your Account*\n\nTo manage your tasks right here, connect your Telegram to Saarthi:\n\n1. Login or signup on our secure web app:\n🔗 [Click here to Login](${appUrl})\n2. Go to *Settings* ⚙️ -> *Telegram Link*.\n3. Generate a secure 6-digit linking code.\n4. Type \`/link <code>\` in this chat!\n\n_Example: \`/link 123456\`_`;
+      const text = `🔑 *Link your account*\n\n1. Open your [Saarthi Dashboard](${appUrl})\n2. Go to **Settings** > **Telegram**\n3. Send your linking code here:\n\n\`/link 123456\``;
       await this.editMessageText(chatId, messageId, text, {
         reply_markup: {
           inline_keyboard: [
-            [
-              { text: "⬅️ Back", callback_data: "onboard_slide_0" },
-              { text: "Skip & Next ➡️", callback_data: "onboard_slide_2" }
-            ]
+            [{ text: "⬅️ Back", callback_data: "onboard_slide_0" }]
           ]
         }
       });
-    } else if (data === "onboard_slide_2") {
-      const text = `🔔 *Step 2: Intelligent Notification Alerts*\n\nSaarthi never spams. You will receive premium alerts only when they matter:\n\n🚨 *Risk Emergency Alerts* (When deadline confidence falls)\n☕ *Daily Morning Briefing* (At 8:00 AM local time)\n📝 *Evening Reflection* (Task metrics and daily summary)\n\nYou can easily customize or turn off these notifications under settings.`;
-      await this.editMessageText(chatId, messageId, text, {
-        reply_markup: {
-          inline_keyboard: [
-            [
-              { text: "⬅️ Back", callback_data: "onboard_slide_1" },
-              { text: "Finalize Setup ➡️", callback_data: "onboard_slide_3" }
-            ]
-          ]
-        }
-      });
-    } else if (data === "onboard_slide_3") {
-      const text = `🚀 *You are Ready to Roll!*\n\nYou have unlocked Saarthi's full conversational experience on Telegram.\n\n💡 *Pro-Tips:*\n• Use the persistent keyboard menu below to quickly access sections.\n• Text me in natural language anytime: _"Completed DBMS part 2"_ or _"Feeling tired reschedule tomorrow"_\n• Ask the AI Assistant for planning advice or study roadmaps!`;
-      await this.editMessageText(chatId, messageId, text, {
-        reply_markup: {
-          inline_keyboard: [
-            [
-              { text: "⬅️ Back", callback_data: "onboard_slide_2" },
-              { text: "Let's Go! 🚀", callback_data: "onboard_done" }
-            ]
-          ]
-        }
-      });
-    } else if (data === "onboard_done") {
-      const text = `✨ *Namaste! Welcome to Saarthi.* ✨\n\nYour account setup is completed! Use the menu below to explore your active commitments, check execution health, or consult the AI Assistant.\n\nHave a productive day! 🚀`;
-      await this.sendMessage(chatId, text, {
-        reply_markup: this.getMenuKeyboard()
-      });
-      try {
-        const deleteUrl = `https://api.telegram.org/bot${this.token}/deleteMessage?chat_id=${chatId}&message_id=${messageId}`;
-        await fetch(deleteUrl);
-      } catch (e) {}
     }
   }
+
 
   /**
    * Verify generated link code and link Telegram Chat ID
@@ -675,15 +655,69 @@ export class TelegramService {
   /**
    * List all active tasks
    */
+  
+  /**
+   * Home Screen Dashboard
+   */
+  async handleHome(chatId: number, userId: string, username: string, editMessageId?: number) {
+    try {
+      const tasksSnap = await dbAdmin.collection("tasks").where("userId", "==", userId).get();
+      const tasks = tasksSnap.docs.map((d: any) => ({ id: d.id, ...d.data() }));
+      const activeTasks = tasks.filter((t: any) => t.subtasks.some((s: any) => !s.done));
+
+      let totalConfidence = 0;
+      activeTasks.forEach((t: any) => totalConfidence += computeRiskScore(t).completionConfidence);
+      const avgConfidence = activeTasks.length > 0 ? Math.round(totalConfidence / activeTasks.length) : 100;
+      
+      const criticalCount = activeTasks.filter((t: any) => computeRiskScore(t).zone === "critical").length;
+      
+      let text = `🏠 *Saarthi Home*\n\n✨ Good to see you, ${username}.\n\n`;
+      text += `━━━━━━━━━━━━━━\n`;
+      text += `📈 *Execution Health*: ${avgConfidence}%\n`;
+      text += `🎯 *Active Tasks*: ${activeTasks.length}\n`;
+      if (criticalCount > 0) {
+        text += `⚠️ *Recovery Alerts*: ${criticalCount} critical\n`;
+      } else {
+        text += `✅ *Recovery Alerts*: None\n`;
+      }
+      text += `━━━━━━━━━━━━━━\n\n`;
+      
+      // Get current focus
+      const sortedTasks = [...activeTasks].sort((a: any, b: any) => new Date(a.deadline || a.dueDate).getTime() - new Date(b.deadline || b.dueDate).getTime());
+      if (sortedTasks.length > 0) {
+        text += `🎯 *Current Focus*\n${sortedTasks[0].title}\n\n`;
+      } else {
+        text += `🎯 *Current Focus*\nNone. Ready to plan?\n\n`;
+      }
+      
+      text += `What would you like to do?`;
+      
+      const inline_keyboard = [
+        [{ text: "📅 Today's Plan", callback_data: "menu_today" }, { text: "📋 All Tasks", callback_data: "tasks_list" }],
+        [{ text: "🛟 Recovery Center", callback_data: "menu_recovery" }, { text: "⚙️ Settings", callback_data: "help_topic:settings_back" }]
+      ];
+      
+      if (editMessageId) {
+        await this.editMessageText(chatId, editMessageId, text, { reply_markup: { inline_keyboard } });
+      } else {
+        await this.sendMessage(chatId, text, { reply_markup: { inline_keyboard } });
+      }
+    } catch (e: any) {
+      console.error(e);
+      await this.sendMessage(chatId, `⚠️ Could not load home.`);
+    }
+  }
+
   async handleTasks(chatId: number, userId: string, editMessageId?: number) {
     try {
       const tasksSnap = await dbAdmin.collection("tasks").where("userId", "==", userId).get();
       const tasks = tasksSnap.docs.map((d: any) => ({ id: d.id, ...d.data() } as Task));
       const activeTasks = tasks.filter((t) => t.subtasks.some((s) => !s.done));
 
+      
       if (activeTasks.length === 0) {
-        const text = "📝 *No active tasks found.*\n\n🎉 All of your commitments are fully completed! Your execution slate is pristine. Fantastic job!";
-        const opt = { reply_markup: { inline_keyboard: [[{ text: "➕ Open Web App to Create Task", url: this.getLiveAppUrl() }]] } };
+        const text = "📝 *No active tasks.*\n\nYour execution slate is pristine. Fantastic job!";
+        const opt = { reply_markup: { inline_keyboard: [[{ text: "➕ Create Task (Web)", url: this.getLiveAppUrl() }]] } };
         if (editMessageId) {
           await this.editMessageText(chatId, editMessageId, text, opt);
         } else {
@@ -692,16 +726,14 @@ export class TelegramService {
         return;
       }
 
-      let text = `📋 *Saarthi - Your Active Commitments* 📋\n\n`;
-      text += `You have *${activeTasks.length}* active commitments currently pending execution.\n\n`;
-      text += `Select a task below to inspect detailed metrics, toggle subtasks, snooze deadlines, or trigger an AI recovery plan:`;
+      let text = `📋 *Active Tasks*\n\nYou have ${activeTasks.length} commitments pending.\n\nSelect a task below:`;
 
       const inline_keyboard: any[][] = [];
-      activeTasks.forEach((t, i) => {
+      activeTasks.forEach((t: any) => {
         const risk = computeRiskScore(t);
         const riskEmoji = risk.zone === "critical" ? "🚨" : risk.zone === "watch" ? "⚠️" : "✅";
         inline_keyboard.push([
-          { text: `${riskEmoji} ${i + 1}. ${t.title} (${Math.round(risk.completionConfidence)}%)`, callback_data: `task_details:${t.id}` }
+          { text: `${riskEmoji} ${t.title} (${Math.round(risk.completionConfidence)}%)`, callback_data: `task_details:${t.id}` }
         ]);
       });
 
@@ -711,8 +743,9 @@ export class TelegramService {
       } else {
         await this.sendMessage(chatId, text, opt);
       }
+
     } catch (error: any) {
-      const errText = `⚠️ *Failed to fetch tasks:* ${error.message}`;
+      const errText = `⚠️ Failed to load tasks.`;
       if (editMessageId) {
         await this.editMessageText(chatId, editMessageId, errText);
       } else {
@@ -734,6 +767,7 @@ export class TelegramService {
         return;
       }
 
+      
       const t = { id: docSnap.id, ...docSnap.data() } as Task;
       const risk = computeRiskScore(t);
       const riskEmoji = risk.zone === "critical" ? "🚨" : risk.zone === "watch" ? "⚠️" : "✅";
@@ -742,57 +776,42 @@ export class TelegramService {
       const deadlineDate = new Date(t.deadline).toLocaleDateString("en-US", {
         weekday: "short",
         month: "short",
-        day: "numeric",
-        year: "numeric"
+        day: "numeric"
       });
 
       const hoursRemaining = getHoursRemaining(t.deadline);
       const daysRemaining = Math.max(0, Math.ceil(hoursRemaining / 24));
       
       const totalSubtasks = t.subtasks.length;
-      const completedSubtasks = t.subtasks.filter(s => s.done).length;
-      const remainingMinutes = t.subtasks.filter(s => !s.done).reduce((acc, s) => acc + (s.estimatedMinutes || 30), 0);
+      const completedSubtasks = t.subtasks.filter((s: any) => s.done).length;
+      const remainingMinutes = t.subtasks.filter((s: any) => !s.done).reduce((acc: any, s: any) => acc + (s.estimatedMinutes || 30), 0);
 
-      const subtaskList = t.subtasks
-        .sort((a, b) => (a.order || 0) - (b.order || 0))
-        .map(s => `${s.done ? "✅" : "⬜"} ${s.title} (${s.estimatedMinutes || 30}m)`)
-        .slice(0, 5)
-        .join("\n");
-
-      let card = `━━━━━━━━━━━━━━━━━━━━━━\n`;
-      card += `🎯 *TASK:* ${t.title.toUpperCase()}\n`;
-      card += `━━━━━━━━━━━━━━━━━━━━━━\n`;
-      card += `📝 *Description:* _${t.description || "No description provided."}_\n\n`;
-      card += `📅 *Deadline:* ${deadlineDate} (${daysRemaining} days left)\n`;
-      card += `⚡ *Complexity:* ${compEmoji} ${t.complexity.toUpperCase()}\n`;
-      card += `⏱️ *Remaining Effort:* ~${Math.round(remainingMinutes)} mins\n\n`;
-      card += `📊 *Execution Metrics:*\n`;
-      card += `├─ Completion Confidence: *${Math.round(risk.completionConfidence)}%*\n`;
-      card += `├─ Risk Zone: ${riskEmoji} *${risk.zone.toUpperCase()}* (Score: ${risk.score}/100)\n`;
-      card += `└─ Progress: *${completedSubtasks}/${totalSubtasks}* milestones completed\n\n`;
-      card += `📌 *Milestones Slate:*\n${subtaskList || "No subtasks defined."}\n`;
-      if (totalSubtasks > 5) {
-        card += `_...and ${totalSubtasks - 5} more milestones_\n`;
-      }
-      card += `━━━━━━━━━━━━━━━━━━━━━━`;
+      let card = `━━━━━━━━━━━━━━\n`;
+      card += `🎯 *${t.title.toUpperCase()}*\n`;
+      card += `━━━━━━━━━━━━━━\n\n`;
+      card += `📅 *Deadline*: ${deadlineDate} (${daysRemaining}d)\n`;
+      card += `⏱️ *Time Left*: ~${Math.round(remainingMinutes)} mins\n\n`;
+      card += `📊 *Health*: ${riskEmoji} ${risk.zone.toUpperCase()} (${Math.round(risk.completionConfidence)}%)\n`;
+      card += `📈 *Progress*: ${completedSubtasks}/${totalSubtasks} completed\n\n`;
+      card += `━━━━━━━━━━━━━━`;
 
       const inline_keyboard = [
         [
-          { text: "✅ Complete Milestone", callback_data: `milestones_list:${t.id}` },
-          { text: "⏰ Snooze", callback_data: `task_snooze:${t.id}` }
+          { text: "✅ Check Milestones", callback_data: `milestones_list:${t.id}` }
         ],
         [
           { text: "📅 Reschedule", callback_data: `task_snooze:${t.id}` },
-          { text: "🛟 Recovery Plan", callback_data: `task_recovery:${t.id}` }
+          { text: "🛟 Recovery", callback_data: `task_recovery:${t.id}` }
         ],
         [
-          { text: "⬅️ Back to Task List", callback_data: "tasks_list" }
+          { text: "⬅️ Back", callback_data: "tasks_list" }
         ]
       ];
 
       await this.editMessageText(chatId, editMessageId, card, {
         reply_markup: { inline_keyboard }
       });
+
     } catch (err: any) {
       await this.editMessageText(chatId, editMessageId, `⚠️ Error loading task details: ${err.message}`);
     }
@@ -866,6 +885,7 @@ export class TelegramService {
         sessionsCompleted: completedCount,
         riskScore: risk.score,
         riskZone: risk.zone,
+        lastUpdated: Date.now(),
       };
 
       if (completedCount === plannedCount) {
@@ -946,7 +966,9 @@ export class TelegramService {
         googleCalendarSynced: false
       });
 
-      const text = `🎉 *Deadline Snoozed Successfully!*\n\n• Task: *"${task.title}"*\n• New Deadline: *${currentDeadline.toLocaleDateString()}*\n• Recalculated Confidence: *${Math.round(risk.completionConfidence)}%*\n• Risk Zone: *${risk.zone.toUpperCase()}*`;
+      
+      const text = `🎉 *Snoozed!*\n\n• Task: *${task.title}*\n• New Deadline: *${currentDeadline.toLocaleDateString()}*\n• Health: *${risk.zone.toUpperCase()}* (${Math.round(risk.completionConfidence)}%)`;
+
       
       const inline_keyboard = [
         [{ text: "🔍 Open Task Card", callback_data: `task_details:${task.id}` }],
@@ -966,7 +988,8 @@ export class TelegramService {
    */
   private async executeTaskRecovery(chatId: number, userId: string, taskId: string, editMessageId: number) {
     try {
-      await this.editMessageText(chatId, editMessageId, "🛟 *Formulating tactical AI Recovery strategy... Please wait.*");
+      await this.editMessageText(chatId, editMessageId, "🛟 _Generating recovery strategy..._");
+      await this.sendChatAction(chatId, "typing");
 
       const docRef = dbAdmin.collection("tasks").doc(taskId);
       const docSnap = await docRef.get();
@@ -1000,10 +1023,9 @@ export class TelegramService {
         recoveryPlan: updatedPlan,
       });
 
-      let text = `━━━━━━ 🛟 *RECOVERY PLAN* ━━━━━━\n`;
-      text += `🎯 *Task:* ${task.title.toUpperCase()}\n\n`;
-      text += `⚠️ *Situation Diagnosis:*\n_${plan.situationSummary}_\n\n`;
-      text += `🎯 *Motivational Priority:*\n*${plan.messageToUser}*\n\n`;
+      let text = `🛟 *Recovery Plan: ${task.title}*\n\n`;
+      text += `_${plan.situationSummary}_\n\n`;
+      text += `*${plan.messageToUser}*\n\n`;
       text += `✂️ *Tactical Intervention Advice:*\n${plan.advice}\n\n`;
       text += `📈 *Expected Improvement:* +25% Confidence recovery upon applying these descaling guidelines.\n`;
       text += `━━━━━━━━━━━━━━━━━━━━━━━━━━`;
@@ -1056,99 +1078,48 @@ export class TelegramService {
   /**
    * Command: /Status: Execution Health Summary
    */
+  
   async handleStatus(chatId: number, userId: string, editMessageId?: number) {
     try {
-      if (!editMessageId) {
-        await this.sendMessage(chatId, "📊 *Analyzing and compiling your execution health metrics...*");
-      }
-
       const tasksSnap = await dbAdmin.collection("tasks").where("userId", "==", userId).get();
-      const tasks = tasksSnap.docs.map((d: any) => ({ id: d.id, ...d.data() } as Task));
-      const activeTasks = tasks.filter((t) => t.subtasks.some((s) => !s.done));
+      const tasks = tasksSnap.docs.map((d: any) => ({ id: d.id, ...d.data() }));
+      const activeTasks = tasks.filter((t: any) => t.subtasks.some((s: any) => !s.done));
+
+      let totalConfidence = 0;
+      activeTasks.forEach((t: any) => totalConfidence += computeRiskScore(t).completionConfidence);
+      const avgConfidence = activeTasks.length > 0 ? Math.round(totalConfidence / activeTasks.length) : 100;
+      const criticalCount = activeTasks.filter((t: any) => computeRiskScore(t).zone === "critical").length;
 
       if (activeTasks.length === 0) {
-        const clearMsg = "🟢 *Execution Health: PERFECT* 🟢\n\n• Active Tasks: *0*\n• Average Confidence: *100%*\n\nAll milestones are completed! Outstanding velocity. Send /tasks or use settings to link new plans.";
-        if (editMessageId) {
-          await this.editMessageText(chatId, editMessageId, clearMsg);
-        } else {
-          await this.sendMessage(chatId, clearMsg);
-        }
+        await this.sendMessage(chatId, "⭐ *100% Execution Confidence!* You are fully caught up.");
         return;
       }
 
-      let totalConfidence = 0;
-      let criticalCount = 0;
-      let watchCount = 0;
-      let safeCount = 0;
-      let totalRemainingMinutes = 0;
-
-      activeTasks.forEach((t) => {
-        const risk = computeRiskScore(t);
-        totalConfidence += risk.completionConfidence;
-        if (risk.zone === "critical") criticalCount++;
-        else if (risk.zone === "watch") watchCount++;
-        else safeCount++;
-
-        const taskRem = t.subtasks.filter((s) => !s.done).reduce((acc, s) => acc + (s.estimatedMinutes || 30), 0);
-        totalRemainingMinutes += taskRem;
-      });
-
-      const avgConfidence = Math.round(totalConfidence / activeTasks.length);
-      const totalRemainingHours = (totalRemainingMinutes / 60).toFixed(1);
-      
-      const overallStatusEmoji = avgConfidence >= 80 ? "🟢" : avgConfidence >= 50 ? "🟡" : "🔴";
-      const overallStatusText = avgConfidence >= 80 ? "EXCELLENT & STABLE" : avgConfidence >= 50 ? "WATCHFUL PACING REQUIRED" : "CRITICAL RISK EXPOSURE";
-
-      let dynamicInsight = "";
-      if (criticalCount > 0) {
-        dynamicInsight = `You have *${criticalCount}* task(s) in the critical high-risk zone. We highly recommend activating a strategic Rescue Plan to salvage your timelines.`;
-      } else if (watchCount > 0) {
-        dynamicInsight = `Pacing is slightly constrained on *${watchCount}* task(s). Minor timeline buffer adjustment or a quick 20-minute study sprint will put you back in the Safe Zone.`;
-      } else {
-        dynamicInsight = `Spectacular! All of your active goals are pacing safely within their schedules. Continue checking off milestones sequentially!`;
-      }
-
-      let text = `━━━━━━━━━━━━━━━━━━━━━━\n`;
-      text += `🟢 *SAARTHI EXECUTION HEALTH* 🟢\n`;
-      text += `━━━━━━━━━━━━━━━━━━━━━━\n\n`;
-      text += `🎯 *Velocity & Confidence:*\n`;
-      text += `• Average Confidence: *${avgConfidence}%*\n`;
-      text += `• Overall Status: ${overallStatusEmoji} *${overallStatusText}*\n\n`;
-      text += `📉 *Commitment Breakdown:*\n`;
-      text += `• Total Registered Tasks: *${tasks.length}*\n`;
-      text += `• Active commitments: *${activeTasks.length}*\n`;
-      text += `├─ 🚨 Critical Risk Zone: *${criticalCount}*\n`;
-      text += `├─ ⚠️ Watch-Out Zone: *${watchCount}*\n`;
-      text += `└─ ✅ Safe & Stable Zone: *${safeCount}*\n\n`;
-      text += `⏳ *Time Investment:*\n`;
-      text += `• Estimated Remaining Effort: *${totalRemainingHours} hours*\n\n`;
-      text += `💡 *Saarthi AI Insight:*\n`;
-      text += `_${dynamicInsight}_\n`;
-      text += `━━━━━━━━━━━━━━━━━━━━━━`;
+      let text = `━━━━━━━━━━━━━━\n`;
+      text += `📊 *Execution Health Report*\n\n`;
+      text += `🎯 Confidence: *${avgConfidence}%*\n`;
+      text += `📋 Active Tasks: *${activeTasks.length}*\n`;
+      if (criticalCount > 0) text += `🚨 Critical Risk: *${criticalCount}*\n`;
+      text += `\n━━━━━━━━━━━━━━\n\n`;
+      text += `What would you like to review?`;
 
       const inline_keyboard = [
-        [
-          { text: "📅 Today's Plan", callback_data: "menu_today" },
-          { text: "🛟 Recovery Center", callback_data: "menu_recovery" }
-        ],
-        [
-          { text: "🔗 Open Web Dashboard", url: this.getLiveAppUrl() }
-        ]
+        [{ text: "🛟 Recovery Alerts", callback_data: "menu_recovery" }],
+        [{ text: "📋 Active Tasks", callback_data: "tasks_list" }],
+        [{ text: "🏠 Home", callback_data: "menu_home" }]
       ];
 
       if (editMessageId) {
-        await this.editMessageText(chatId, editMessageId, text, {
-          reply_markup: { inline_keyboard }
-        });
+         await this.editMessageText(chatId, editMessageId, text, { reply_markup: { inline_keyboard } });
       } else {
-        await this.sendMessage(chatId, text, {
-          reply_markup: { inline_keyboard }
-        });
+         await this.sendMessage(chatId, text, { reply_markup: { inline_keyboard } });
       }
+
     } catch (error: any) {
-      console.error("Error building execution health status:", error);
+      console.error(error);
     }
   }
+
 
   /**
    * Command / Recovery: Rescue guidelines listing
@@ -1190,9 +1161,7 @@ export class TelegramService {
           reply_markup: { inline_keyboard }
         });
       } else {
-        await this.sendMessage(chatId, text, {
-          reply_markup: { inline_keyboard }
-        });
+        await this.sendMessage(chatId, text, { reply_markup: { inline_keyboard } });
       }
     } catch (error: any) {
       console.error("Error in recovery list handler:", error);
@@ -1210,11 +1179,20 @@ export class TelegramService {
       const now = new Date();
       const todayStr = now.toISOString().split("T")[0];
 
-      const dueToday = tasks.filter((t) => t.deadline.startsWith(todayStr) && t.subtasks.some(s => !s.done));
+      
+      const dueToday = tasks.filter((t: any) => {
+        if (!t.subtasks.some((s: any) => !s.done)) return false;
+        const d = new Date(t.deadline || t.dueDate);
+        const today = new Date();
+        return d.getDate() === today.getDate() && d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear();
+      });
 
       if (dueToday.length === 0) {
-        const text = `📅 *No deadlines due today (${todayStr})!*\n\nKeep up the great work. Check your full list of active commitments or consult your AI Assistant for strategic advice!`;
-        const inline_keyboard = [[{ text: "📋 View Active Tasks", callback_data: "tasks_list" }]];
+        let text = `📅 *Today's Agenda*\n\nNo deadlines today. You have space to focus deeply or rest.`;
+        const inline_keyboard = [
+          [{ text: "📋 View All Tasks", callback_data: "tasks_list" }],
+          [{ text: "🏠 Home", callback_data: "menu_home" }]
+        ];
         if (editMessageId) {
           await this.editMessageText(chatId, editMessageId, text, { reply_markup: { inline_keyboard } });
         } else {
@@ -1223,61 +1201,43 @@ export class TelegramService {
         return;
       }
 
-      let text = `📅 *Saarthi - Your Agenda For Today (${todayStr})* 📅\n\n`;
-      text += `You have *${dueToday.length}* task(s) reaching their target deadlines today. Focus your energy here first:\n\n`;
-
-      dueToday.forEach((t, i) => {
-        const completed = t.subtasks.filter((s) => s.done).length;
-        const total = t.subtasks.length;
-        const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
-        
-        text += `*${i + 1}. ${t.title}*\n`;
-        text += `   • Progress: *${completed}/${total}* milestones completed (${pct}%)\n`;
-        if (t.reminderContext?.nextLogicalStep) {
-          text += `   • Next Step: _"${t.reminderContext.nextLogicalStep}"_\n`;
-        }
-        text += `\n`;
-      });
-
+      let text = `📅 *Today's Agenda*\n\n`;
       const inline_keyboard: any[][] = [];
-      dueToday.forEach((t) => {
-        inline_keyboard.push([
-          { text: `🎯 Manage: "${t.title}"`, callback_data: `task_details:${t.id}` }
-        ]);
+      dueToday.forEach((t: any) => {
+        inline_keyboard.push([{ text: `🎯 ${t.title}`, callback_data: `task_details:${t.id}` }]);
       });
-
+      inline_keyboard.push([{ text: "🏠 Home", callback_data: "menu_home" }]);
+      
       if (editMessageId) {
-        await this.editMessageText(chatId, editMessageId, text, {
-          reply_markup: { inline_keyboard }
-        });
+        await this.editMessageText(chatId, editMessageId, text, { reply_markup: { inline_keyboard } });
       } else {
-        await this.sendMessage(chatId, text, {
-          reply_markup: { inline_keyboard }
-        });
+        await this.sendMessage(chatId, text, { reply_markup: { inline_keyboard } });
       }
+
     } catch (error: any) {
-      console.error("Error in Today's plan handler:", error);
+      console.error(error);
     }
   }
 
   /**
    * Command / Help: Help Center navigation
    */
+  
   async handleHelp(chatId: number, userId: string, editMessageId?: number) {
-    const text = `❓ *Saarthi Companion Help Center* ❓\n\nWelcome to your guide on getting the most out of Saarthi! Select a topic below to discover how I help you execute on your commitments:`;
+    const text = `👋 *Here to help.*\n\nWhat do you need assistance with?`;
     
     const inline_keyboard = [
       [
         { text: "🚀 Getting Started", callback_data: "help_topic:start" },
-        { text: "📋 Core Features", callback_data: "help_topic:features" }
+        { text: "📋 Features", callback_data: "help_topic:features" }
       ],
       [
-        { text: "💡 Examples", callback_data: "help_topic:examples" },
-        { text: "🔒 Privacy & Security", callback_data: "help_topic:privacy" }
+        { text: "💬 Conversations", callback_data: "help_topic:examples" },
+        { text: "🔗 Connect Dashboard", callback_data: "help_topic:linking" }
       ],
       [
-        { text: "🔑 Account Linking", callback_data: "help_topic:linking" },
-        { text: "💬 FAQ & Support", callback_data: "help_topic:faq" }
+        { text: "⚙️ Settings", callback_data: "help_topic:settings_back" },
+        { text: "❓ FAQ", callback_data: "help_topic:faq" }
       ]
     ];
 
@@ -1295,31 +1255,39 @@ export class TelegramService {
   /**
    * Help Center Detailed content display
    */
+  
   private async showHelpTopic(chatId: number, topic: string, editMessageId: number) {
     let text = "";
     if (topic === "start") {
-      text = `🚀 *Getting Started with Saarthi*\n\n1. Use the Reply Keyboard buttons at the bottom of your chat to instantly browse sections.\n2. Tap *My Tasks* to view, toggle, or snooze active commitments.\n3. Type in natural language (e.g., _"Completed DBMS Unit 3 study"_) and Saarthi's AI will parse your message and update Firestore in real-time.\n4. Ask any study or scheduling question to get motivating, structured feedback!`;
+      text = `🚀 *Getting Started*\n\nI'm here to help you execute your tasks smoothly.\n\n• **Talk to me naturally.** Say "Finished my ML essay" or "I'm overwhelmed.\n• **Navigate with buttons.** Use the inline buttons to view tasks, check health, and get recovery plans.\n\nReady to begin?`;
     } else if (topic === "features") {
-      text = `📋 *Saarthi Premium Features*\n\n• *Intelligent Risk Detection:* Continuously analyzes schedule buffer ratios and alerts you if execution pacing looks weak.\n• *Interactive Recovery Roadmaps:* Automatically generates compressed, viable execution compromise suggestions when deadlines are threatened.\n• *Morning Strategic Briefings:* Sends custom briefs to map your highest-priority milestones daily.\n• *Google Calendar & Tasks Sync:* Seamlessly syncs your timeline updates across devices.`;
+      text = `📋 *Core Capabilities*\n\n• **Risk Detection:** I monitor your schedule and alert you if deadlines slip.\n• **Recovery Plans:** If things go wrong, I provide structured rescue roadmaps.\n• **Daily Briefings:** Morning strategic briefs and evening reflections.`;
     } else if (topic === "examples") {
-      text = `💡 *Conversational Examples*\n\nTry sending these messages directly to me:\n\n• _"Finished DBMS Unit 3"_ (Marks milestone complete)\n• _"Snooze machine learning project by 3 days"_ (Updates deadline)\n• _"I'm feeling super overwhelmed today help me"_ (Generates emergency recovery roadmap)\n• _"What should I study next?"_ (AI suggests focus milestones)\n• _"Can you explain normal forms in database?"_ (AI explains study topics)`;
+      text = `💡 *What to say*\n\nTry sending:\n\n• _"Finished DBMS Unit 3"_\n• _"Snooze my ML project by 2 days"_\n• _"I'm feeling overwhelmed today"_\n• _"What should I focus on next?"_`;
     } else if (topic === "privacy") {
-      text = `🔒 *Privacy & Security Guarantee*\n\n• *Secure Isolation:* All data is isolated under your specific authenticated Saarthi account in Firestore.\n• *No Exposure:* Your Gemini API keys are hosted fully on secure, server-side infrastructure and are never transmitted to Telegram or the client browser.\n• *Zero Spam:* Saarthi only notifies you on critical risk escalations, morning briefs, or when actively requested.`;
+      text = `🔒 *Privacy*\n\nYour data is safely isolated in your secure Firestore account. Your API keys are encrypted server-side and never exposed. I only notify you when requested or for critical risk alerts.`;
     } else if (topic === "linking") {
-      text = `🔑 *Account Linking Instructions*\n\n1. Sign in/sign up on the Saarthi web app.\n2. Tap the settings gear icon ⚙️ in the top right.\n3. Open the *Telegram Link* tab and generate your secure 6-digit link code.\n4. Copy the code and type \`/link <code>\` in this chat to complete synchronization.\n\n_Example: \`/link 123456\`_`;
+      text = `🔗 *Dashboard Link*\n\nI work in perfect sync with your Saarthi Web Dashboard. You can create tasks on the web and manage execution here.\n\n[Open Web Dashboard](${this.getLiveAppUrl()})`;
     } else if (topic === "faq") {
-      text = `💬 *FAQ & Companion Support*\n\n*Q: Why are my command buttons missing?*\nA: Click the keyboard layout icon in your Telegram chat box to bring back the persistent Saarthi menu buttons.\n\n*Q: How do I change my notifications?*\nA: Click *Settings* on the menu to customize daily briefing and alert frequencies.\n\n*Q: Where is my data saved?*\nA: All metrics sync instantly to your cloud-hosted Firestore database.`;
+      text = `❓ *FAQ*\n\n**Q: How do I create a task?**\nA: Right now, task creation happens on the Web Dashboard.\n\n**Q: How do I turn off notifications?**\nA: Head over to Settings.\n\n**Q: Who built Saarthi?**\nA: You did, with AI Studio Build!`;
+    } else {
+      text = `No information found for this topic.`;
     }
 
-    const inline_keyboard = [[{ text: "⬅️ Back to Help Center", callback_data: "help_index" }]];
+    const inline_keyboard = [
+      [{ text: "⬅️ Back to Help", callback_data: "help_index" }, { text: "🏠 Home", callback_data: "menu_home" }]
+    ];
+
     await this.editMessageText(chatId, editMessageId, text, {
       reply_markup: { inline_keyboard }
     });
   }
 
+
   /**
    * Command / Settings: Settings customization card
    */
+  
   async handleSettings(chatId: number, userId: string, editMessageId?: number) {
     try {
       const docRef = dbAdmin.collection("userSettings").doc(userId);
@@ -1334,27 +1302,26 @@ export class TelegramService {
         language: "English"
       };
 
-      let text = `⚙️ *Saarthi Companion Settings* ⚙️\n\n`;
-      text += `Customize your productivity assistant preferences below:\n\n`;
-      text += `• *Alert Frequency:* *${pref.notifications.toUpperCase()}*\n`;
-      text += `• *Morning Briefing:* *${pref.dailyBriefing ? "✅ ENABLED" : "❌ DISABLED"}*\n`;
-      text += `• *Evening Reflection:* *${pref.eveningReview ? "✅ ENABLED" : "❌ DISABLED"}*\n`;
-      text += `• *Calendar Sync:* *${pref.calendarSync ? "✅ ENABLED" : "❌ DISABLED"}*\n`;
-      text += `• *Preferred Language:* *${pref.language || "English"}*\n\n`;
-      text += `Select a preference below to adjust:`;
+      let text = `⚙️ *Settings*\n\n`;
+      text += `Configure your assistant.\n\n`;
+      text += `• Alerts: *${pref.notifications.toUpperCase()}*\n`;
+      text += `• Morning Brief: *${pref.dailyBriefing ? "ON" : "OFF"}*\n`;
+      text += `• Evening Review: *${pref.eveningReview ? "ON" : "OFF"}*\n`;
+      text += `• Sync: *${pref.calendarSync ? "ON" : "OFF"}*\n`;
+      text += `• Language: *${pref.language || "English"}*\n`;
 
       const inline_keyboard = [
         [
-          { text: `Morning Brief: ${pref.dailyBriefing ? "☕ ON" : "💤 OFF"}`, callback_data: "toggle_setting:dailyBriefing" },
-          { text: `Evening Review: ${pref.eveningReview ? "📝 ON" : "💤 OFF"}`, callback_data: "toggle_setting:eveningReview" }
+          { text: `Morning Brief: ${pref.dailyBriefing ? "✅ ON" : "❌ OFF"}`, callback_data: "toggle_setting:dailyBriefing" },
+          { text: `Evening Review: ${pref.eveningReview ? "✅ ON" : "❌ OFF"}`, callback_data: "toggle_setting:eveningReview" }
         ],
         [
-          { text: `Calendar Sync: ${pref.calendarSync ? "📅 ON" : "💤 OFF"}`, callback_data: "toggle_setting:calendarSync" },
-          { text: "🔔 Notification Alert Style", callback_data: "config_notifications" }
+          { text: `Calendar Sync: ${pref.calendarSync ? "✅ ON" : "❌ OFF"}`, callback_data: "toggle_setting:calendarSync" },
+          { text: "🔔 Alert Style", callback_data: "config_notifications" }
         ],
         [
-          { text: "🌐 Assistant Language", callback_data: "config_lang" },
-          { text: "🔗 Open Saarthi Web App", url: this.getLiveAppUrl() }
+          { text: "🏠 Home", callback_data: "menu_home" },
+          { text: "🔗 Web Dashboard", url: this.getLiveAppUrl() }
         ]
       ];
 
@@ -1371,6 +1338,7 @@ export class TelegramService {
       console.error("Error loading settings:", err);
     }
   }
+
 
   /**
    * Toggle user Settings preference field
@@ -1523,36 +1491,31 @@ export class TelegramService {
    */
   async handleEveningReview(chatId: number, userId: string) {
     try {
-      await this.sendMessage(chatId, "☕ *Reflecting on your daily progress... Please wait.*");
+      await this.sendChatAction(chatId, "typing");
+      const loadingMsg = await this.sendMessage(chatId, "☕ _Reflecting on your day..._");
+      const loadingMsgId = loadingMsg?.message_id;
 
       const tasksSnap = await dbAdmin.collection("tasks").where("userId", "==", userId).get();
       const tasks = tasksSnap.docs.map((d: any) => ({ id: d.id, ...d.data() } as Task));
       const activeTasks = tasks.filter((t) => t.subtasks.some((s) => !s.done));
 
-      const completedSubtasksList = tasks.flatMap(t => t.subtasks.filter(s => s.done));
+      
+      const completedSubtasksList = tasks.flatMap(t => t.subtasks.filter(s => s.done && t.lastUpdated > Date.now() - 24*60*60*1000));
       const pendingSubtasksList = tasks.flatMap(t => t.subtasks.filter(s => !s.done));
 
-      let text = `━━━━━━ 📝 *EVENING REFLECTION* ━━━━━━\n`;
-      text += `Good Evening! Let's reflect on your achievements today:\n\n`;
-      text += `📈 *Daily Progress Summary:*\n`;
-      text += `• Total Tasks: *${tasks.length}*\n`;
-      text += `• Completed Milestones: *${completedSubtasksList.length}*\n`;
-      text += `• Pending Milestones left: *${pendingSubtasksList.length}*\n\n`;
-      
-      if (activeTasks.length > 0) {
-        text += `🎯 *Focus Priorities For Tomorrow:*\n`;
-        activeTasks.slice(0, 3).forEach((t, i) => {
-          const nextS = t.subtasks.find(s => !s.done);
-          text += `*${i + 1}. ${t.title}*\n`;
-          text += `   👉 Next: ${nextS ? nextS.title : "None"}\n`;
-        });
+      let text = `🌙 *Nice work today.*\n\nYou completed:\n\n`;
+      if (completedSubtasksList.length > 0) {
+        completedSubtasksList.slice(0, 3).forEach(s => text += `✅ ${s.title}\n`);
       } else {
-        text += `🎉 *All clear!* You have completed all active commitments. Spectacular pacing!\n`;
+        text += `• Zero milestones today. That's okay, tomorrow is a new day.\n`;
       }
       
-      text += `\n💡 *Saarthi Companion Tip:*\n`;
-      text += `Getting a full night of rest protects your neuro-cognitive stamina. Relax tonight and wake up ready to conquer tomorrow!\n`;
-      text += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
+      if (pendingSubtasksList.length > 0) {
+        text += `\nStill pending:\n`;
+        pendingSubtasksList.slice(0, 3).forEach(s => text += `• ${s.title}\n`);
+      }
+      
+      text += `\nRest well.\nWe'll continue tomorrow.`;
 
       const inline_keyboard = [
         [{ text: "📅 Today's Agenda", callback_data: "menu_today" }],
@@ -1572,55 +1535,50 @@ export class TelegramService {
    */
   async handleBriefing(chatId: number, userId: string) {
     try {
-      await this.sendMessage(chatId, "☕ *Brewing your strategic morning briefing... Please wait.*");
+      await this.sendChatAction(chatId, "typing");
+      const loadingMsg = await this.sendMessage(chatId, "☕ _Preparing morning briefing..._");
+      const loadingMsgId = loadingMsg?.message_id;
 
       const tasksSnap = await dbAdmin.collection("tasks").where("userId", "==", userId).get();
       const tasks = tasksSnap.docs.map((d) => ({ id: d.id, ...d.data() } as Task));
       const activeTasks = tasks.filter((t) => t.subtasks.some((s) => !s.done));
 
       if (activeTasks.length === 0) {
-        await this.sendMessage(
-          chatId,
-          "☕ *Good Morning!* You have no pending active commitments. A fully cleared execution slate! Enjoy your day or plan a new goal."
-        );
+        const msg = "☕ *Good Morning!* Your execution slate is pristine.\n\nEnjoy your day or plan a new goal."; if (loadingMsgId) await this.editMessageText(chatId, loadingMsgId, msg); else await this.sendMessage(chatId, msg);
         return;
       }
 
-      const tasksPayload = activeTasks.map((t) => {
-        const risk = computeRiskScore(t);
-        return {
-          title: t.title,
-          description: t.description,
-          deadline: t.deadline,
-          complexity: t.complexity,
-          progress: `${t.subtasks.filter((s) => s.done).length}/${t.subtasks.length}`,
-          riskScore: risk.score,
-          riskZone: risk.zone,
-          nextLogicalStep: t.reminderContext?.nextLogicalStep || "Not specified",
-        };
+      
+      let totalRemainingMinutes = 0;
+      activeTasks.forEach((t) => {
+        const taskRem = t.subtasks.filter((s) => !s.done).reduce((acc, s) => acc + (s.estimatedMinutes || 30), 0);
+        totalRemainingMinutes += taskRem;
       });
+      const hours = Math.floor(totalRemainingMinutes / 60);
+      const minutes = totalRemainingMinutes % 60;
+      
+      let totalConfidence = 0;
+      activeTasks.forEach(t => totalConfidence += computeRiskScore(t).completionConfidence);
+      const avgConfidence = activeTasks.length > 0 ? Math.round(totalConfidence / activeTasks.length) : 100;
+      
+      const criticalCount = activeTasks.filter(t => computeRiskScore(t).zone === "critical").length;
 
-      const prompt = `You are Saarthi, a wise, structured, and deeply encouraging AI morning executive guide.
-The user is starting their day. Please write a highly personalized, concise, and professional morning executive briefing.
+      let text = `☀️ *Good morning!*\n\nHere's today's plan.\n\n━━━━━━━━━━━━━━\n\n`;
+      text += `📋 *Tasks*\n${activeTasks.length}\n\n`;
+      text += `⏰ *Focus Time*\n${hours}h ${minutes}m\n\n`;
+      text += `📈 *Execution Health*\n${avgConfidence}%\n\n`;
+      if (criticalCount > 0) {
+        text += `⚠️ *Recovery Needed*\n${criticalCount} task${criticalCount > 1 ? 's' : ''}\n\n`;
+      }
+      text += `━━━━━━━━━━━━━━\n\nReady?`;
+      
+      const inline_keyboard = [
+        [{ text: "▶️ Start Focus", callback_data: "tasks_list" }],
+        [{ text: "📅 Today's Plan", callback_data: "menu_today" }],
+        [{ text: "⏰ Reschedule", callback_data: "menu_today" }]
+      ];
 
-Here is their active Saarthi commitments slate:
-${JSON.stringify(tasksPayload, null, 2)}
-
-Provide:
-1. A warm, motivational morning greeting (mentioning coffee/focus).
-2. A clear breakdown of the absolute highest-priority execution items for today.
-3. Laser-focused advice to defeat procrastination on any high-risk tasks (mentioning the exact subtasks/next steps).
-4. A concluding motivational quote or tough love boost.
-
-Keep it structured, punchy, beautifully styled in Markdown (bold text, lists, and quotes), and under 400 words.`;
-
-      const response = await generateContentWithRetryAndFallback(ai, {
-        model: "gemini-3.1-flash-lite",
-        contents: prompt,
-      });
-
-      const briefingText = response.text || "Failed to compile briefing. Keep focus!";
-      await this.sendMessage(chatId, briefingText);
+      await this.sendMessage(chatId, text, { reply_markup: { inline_keyboard } });
     } catch (error: any) {
       await this.sendMessage(chatId, `⚠️ Failed to compile morning briefing: ${error.message}`);
     }
@@ -1639,12 +1597,189 @@ Keep it structured, punchy, beautifully styled in Markdown (bold text, lists, an
       if (!chatId) return;
 
       const risk = computeRiskScore(task);
+      
       if (risk.zone === "critical") {
-        const text = `🚨 *SAARTHI RISK EMERGENCY ALERT* 🚨\n\nYour execution confidence on *"${task.title}"* has dropped critically to *${risk.completionConfidence}%*.\n\n• *Risk Index:* ${risk.score}/100\n• *Primary Obstacle:* _${risk.explanation.primaryReason}_\n• *Strategic Advice:* _${risk.explanation.secondaryReason}_\n\n👉 Send /recovery or open your Saarthi dashboard to enact a dynamic rescue plan and protect your commitments!`;
-        await this.sendMessage(chatId, text);
+        const text = `⚠️ *Heads up.*\n\nYour *${task.title}* is slipping behind schedule.\n\nNothing to panic about.\nI already have a recovery plan ready.`;
+        const inline_keyboard = [
+            [{ text: "🛟 View Recovery", callback_data: `task_recovery:${task.id}` }],
+            [{ text: "⏰ Reschedule", callback_data: `task_snooze:${task.id}` }],
+            [{ text: "🙈 Ignore", callback_data: "tasks_list" }]
+        ];
+        await this.sendMessage(chatId, text, { reply_markup: { inline_keyboard } });
       }
+
     } catch (error) {
       console.error("Failed to trigger recovery alert via Telegram:", error);
+    }
+  }
+
+  /**
+   * Main Router for all generic text inputs (NLP routing / chat / on-topic discussion / automated commands)
+   */
+  private async handleGenericMessage(chatId: number, userId: string, messageText: string) {
+    try {
+      await this.sendChatAction(chatId, "typing");
+      
+      // Fetch user's tasks from Firestore for full conversational/snoozing/progress matching context
+      const tasksSnap = await dbAdmin.collection("tasks").where("userId", "==", userId).get();
+      const tasks = tasksSnap.docs.map((d) => ({ id: d.id, ...d.data() } as Task));
+      
+      const compactTasks = tasks.map(t => ({
+        id: t.id,
+        title: t.title,
+        deadline: t.deadline,
+        isCompleted: t.subtasks.every(s => s.done),
+        subtasks: t.subtasks.map(s => ({ id: s.id, title: s.title, done: s.done }))
+      }));
+
+      const systemInstruction = `You are Saarthi, the user's ultimate personal execution companion and productivity guide.
+You are helping the user track milestones, protect their time, and rescue slipping deadlines.
+
+Your current task is to analyze the user's message, understand their intent, and route/respond accordingly.
+You have access to the user's active/completed tasks list:
+${JSON.stringify(compactTasks, null, 2)}
+
+Identify which intent matches the user's message.
+Possible intents are:
+1. "status" -> User wants to view their overall execution health, risk score, or risk levels. (e.g. "how is my task health?", "check my status", "what is my risk level?", "am I on track?")
+2. "today" -> User wants to see what's planned for today, their schedule, or a daily overview. (e.g. "what do I have for today?", "show today's plan", "today's schedule")
+3. "tasks" -> User wants to view or list all of their tasks, see their board, or commitments. (e.g. "show my tasks", "list my tasks", "what are my commitments?")
+4. "confidence" -> User wants to analyze confidence levels, risk factors, or completion confidence. (e.g. "how confident am I?", "what is my confidence?", "show risk factors")
+5. "recovery" -> User wants to access the recovery center, manage slipping deadlines, or view rescue recovery plans. (e.g. "open recovery center", "show recovery plans", "how do I rescue my deadlines?")
+6. "briefing" -> User wants to hear their dynamic daily briefing or a quick brief. (e.g. "brief me", "give me my daily briefing", "morning briefing")
+7. "help" -> User wants general help, feature explanations, or FAQ. (e.g. "help", "how does this work?", "show instructions", "help index")
+8. "snooze" -> User wants to postpone or snooze a specific task by a number of days. (e.g. "snooze ML project by 2 days", "postpone chemistry assignment for 3 days", "push DBMS by 1 day").
+   If "snooze" is matched, you MUST extract the taskId of the task they mentioned from the tasks list provided above, and the integer number of days to postpone it.
+9. "progress_update" -> User wants to report progress, finish a specific task, or check off a milestone/subtask. (e.g. "Finished DBMS unit 3", "unit 2 done", "completed reading first section", "I just finished task 1").
+10. "chat" -> User is making general, on-topic conversation, asking for productivity/study advice, talking about focus issues, feeling distracted or tired, or inquiring about Saarthi.
+    For "chat", you MUST provide a friendly, encouraging, coaching response in the "chatResponse" property, written in Saarthi's voice, as a knowledgeable and supportive companion.
+11. "off_topic" -> User is asking about completely unrelated things (e.g. "who is Einstein?", "how to bake a cake", "write a python program to scrape a website", "tell me a joke").
+    For "off_topic", you MUST politely explain that you are their Saarthi (personal execution companion) and that you only focus on helping them manage and execute their tasks and hit their deadlines. Provide a warm correction and direct them back to task execution in the "chatResponse" property.
+
+Respond strictly in JSON matching the defined schema. Use 0.0 to 1.0 for confidence.`;
+
+      const response = await generateContentWithRetryAndFallback(ai, {
+        model: "gemini-3.5-flash",
+        contents: `User message: "${messageText}"`,
+        config: {
+          systemInstruction,
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              intent: { type: Type.STRING },
+              confidence: { type: Type.NUMBER },
+              snoozeInfo: {
+                type: Type.OBJECT,
+                properties: {
+                  taskId: { type: Type.STRING },
+                  days: { type: Type.INTEGER }
+                },
+                required: ["taskId", "days"]
+              },
+              chatResponse: { type: Type.STRING }
+            },
+            required: ["intent", "confidence"]
+          }
+        }
+      });
+
+      const result = JSON.parse(response.text.trim());
+
+      // If confidence is too low (< 0.5), default to progress update or general chat
+      if (result.confidence < 0.5) {
+        await this.handleExecutionUpdate(chatId, userId, messageText);
+        return;
+      }
+
+      switch (result.intent) {
+        case "status":
+          await this.handleStatus(chatId, userId);
+          break;
+        case "today":
+          await this.handleToday(chatId, userId);
+          break;
+        case "tasks":
+          await this.handleTasks(chatId, userId);
+          break;
+        case "confidence":
+          await this.handleConfidence(chatId, userId);
+          break;
+        case "recovery":
+          await this.handleRecovery(chatId, userId);
+          break;
+        case "briefing":
+          await this.handleBriefing(chatId, userId);
+          break;
+        case "help":
+          await this.handleHelp(chatId, userId);
+          break;
+        case "progress_update":
+          await this.handleExecutionUpdate(chatId, userId, messageText);
+          break;
+        case "snooze":
+          if (result.snoozeInfo && result.snoozeInfo.taskId && result.snoozeInfo.days && result.snoozeInfo.days > 0) {
+            const taskId = result.snoozeInfo.taskId;
+            const days = result.snoozeInfo.days;
+
+            const docRef = dbAdmin.collection("tasks").doc(taskId);
+            const docSnap = await docRef.get();
+            if (docSnap.exists) {
+              const task = { id: docSnap.id, ...docSnap.data() } as Task;
+              const currentDeadline = new Date(task.deadline);
+              currentDeadline.setDate(currentDeadline.getDate() + days);
+              const newDeadlineStr = currentDeadline.toISOString();
+
+              const tempTask: Task = {
+                ...task,
+                deadline: newDeadlineStr,
+              };
+
+              const risk = computeRiskScore(tempTask);
+
+              await docRef.update({
+                deadline: newDeadlineStr,
+                riskScore: risk.score,
+                riskZone: risk.zone,
+                googleCalendarSynced: false
+              });
+
+              const confirmText = `⏰ *Task Postponed via Saarthi AI!*\n\nI have successfully snoozed your task *${task.title}* by *${days} days*.\n\n• *Old Deadline:* ${new Date(task.deadline).toLocaleDateString()}\n• *New Deadline:* ${currentDeadline.toLocaleDateString()}\n• *Risk Assessment:* *${risk.zone.toUpperCase()}* (${Math.round(risk.completionConfidence)}% confidence)`;
+
+              const inline_keyboard = [
+                [{ text: "🔍 Open Task Card", callback_data: `task_details:${task.id}` }],
+                [{ text: "📋 Back to Task List", callback_data: "tasks_list" }]
+              ];
+
+              await this.sendMessage(chatId, confirmText, { reply_markup: { inline_keyboard } });
+            } else {
+              await this.sendMessage(chatId, "⚠️ I identified the request to snooze, but couldn't locate the matched task in your list. Please use the inline buttons on your tasks to reschedule.");
+            }
+          } else {
+            await this.sendMessage(chatId, "⚠️ I identified the request to snooze, but couldn't extract the task or the number of days. Try saying something like: _'Snooze my ML project by 2 days'_");
+          }
+          break;
+        case "chat":
+        case "off_topic":
+          if (result.chatResponse) {
+            await this.sendMessage(chatId, result.chatResponse, { reply_markup: this.getMenuKeyboard() });
+          } else {
+            await this.sendMessage(chatId, "👋 I'm Saarthi, your personal execution companion! How can I help you manage your study, work, or milestones today?");
+          }
+          break;
+        default:
+          await this.handleExecutionUpdate(chatId, userId, messageText);
+          break;
+      }
+
+    } catch (error: any) {
+      console.error("Error in generic message router:", error);
+      // Fallback to standard execution update if anything fails in NLU routing
+      try {
+        await this.handleExecutionUpdate(chatId, userId, messageText);
+      } catch (innerError: any) {
+        await this.sendMessage(chatId, `⚠️ Error processing message: ${innerError.message}`);
+      }
     }
   }
 
@@ -1653,14 +1788,16 @@ Keep it structured, punchy, beautifully styled in Markdown (bold text, lists, an
    */
   private async handleExecutionUpdate(chatId: number, userId: string, messageText: string) {
     try {
-      await this.sendMessage(chatId, "🤖 *Analyzing execution update...*");
+      await this.sendChatAction(chatId, "typing");
+      const loadingMsg = await this.sendMessage(chatId, "🤖 _Analyzing update..._");
+      const loadingMsgId = loadingMsg?.message_id;
 
       const tasksSnap = await dbAdmin.collection("tasks").where("userId", "==", userId).get();
       const tasks = tasksSnap.docs.map((d) => ({ id: d.id, ...d.data() } as Task));
       const activeTasks = tasks.filter((t) => t.subtasks.some((s) => !s.done));
 
       if (activeTasks.length === 0) {
-        await this.sendMessage(chatId, "🤔 You don't have any active tasks pending currently. Use /tasks to check.");
+        const msg = "🤔 You don't have any active tasks pending currently."; if (loadingMsgId) await this.editMessageText(chatId, loadingMsgId, msg); else await this.sendMessage(chatId, msg);
         return;
       }
 
@@ -1716,19 +1853,20 @@ You must respond strictly in JSON format matching this schema:
 
       const result = JSON.parse(response.text.trim());
 
+      
       if (!result.matched || result.confidence < 0.5 || !result.taskId) {
-        await this.sendMessage(
-          chatId,
-          `🤔 *I'm not completely sure which task you completed.* \n\nCould you clarify? Here are your current active milestones:\n\n` +
-            activeTasks
-              .map((t) => {
-                const undone = t.subtasks.filter((s) => !s.done);
-                return `• *${t.title}*:\n  ` + undone.map((s) => `  - "${s.title}"`).join("\n  ");
-              })
-              .join("\n")
-        );
+        let text = `✨ Nice!\n\nWhich one?\n`;
+        
+        const inline_keyboard: any[][] = [];
+        activeTasks.slice(0, 4).forEach((t) => {
+            inline_keyboard.push([{ text: t.title, callback_data: `task_details:${t.id}` }]);
+        });
+        inline_keyboard.push([{ text: "Something Else", callback_data: "tasks_list" }]);
+
+        await this.sendMessage(chatId, text, { reply_markup: { inline_keyboard } });
         return;
       }
+
 
       // Perform DB updates in Firestore!
       const taskId = result.taskId;
@@ -1738,7 +1876,7 @@ You must respond strictly in JSON format matching this schema:
       const taskSnap = await taskDocRef.get();
 
       if (!taskSnap.exists) {
-        await this.sendMessage(chatId, "⚠️ Could not find the matched task in the database.");
+        const msg = "⚠️ Could not find the matched task in the database."; if (loadingMsgId) await this.editMessageText(chatId, loadingMsgId, msg); else await this.sendMessage(chatId, msg);
         return;
       }
 
@@ -1770,6 +1908,7 @@ You must respond strictly in JSON format matching this schema:
         sessionsCompleted: completedCount,
         riskScore: risk.score,
         riskZone: risk.zone,
+        lastUpdated: Date.now(),
       };
 
       // If all done, update sync statuses
@@ -1779,9 +1918,19 @@ You must respond strictly in JSON format matching this schema:
 
       await taskDocRef.update(updateData);
 
+      
+      
       // Send feedback message
-      let replyMsg = `✅ *Milestone Synced!*\n\n${result.comment}\n\n📊 *Updated Task Status:*\n• Progress: ${completedCount}/${plannedCount} milestones\n• New Confidence: *${risk.completionConfidence}%*\n• Risk Level: *${risk.zone.toUpperCase()}*`;
-      await this.sendMessage(chatId, replyMsg);
+      let replyMsg = `🎉 *Nice!*\n\nMilestone completed.\n\nExecution Health\n📈 Confidence: *${risk.completionConfidence}%*\n\nYou're moving in the right direction.`;
+      
+      const inline_keyboard = [
+        [{ text: "▶️ Next Task", callback_data: "tasks_list" }],
+        [{ text: "📊 Dashboard", callback_data: "menu_today" }],
+        [{ text: "☕ Take a Break", callback_data: "menu_today" }]
+      ];
+      if (loadingMsgId) await this.editMessageText(chatId, loadingMsgId, replyMsg, { reply_markup: { inline_keyboard } }); else await this.sendMessage(chatId, replyMsg, { reply_markup: { inline_keyboard } });
+
+
     } catch (error: any) {
       console.error("Error processing NLP execution update:", error);
       await this.sendMessage(chatId, `⚠️ Failed to process update: ${error.message}`);

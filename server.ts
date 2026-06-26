@@ -15,6 +15,7 @@ import { telegramService } from "./src/services/telegramService.js";
 import { sendError, AppError } from "./src/services/errorHandler.js";
 import { dbData, saveDb } from "./src/services/localDb.js";
 import { generateContentWithRetryAndFallback } from "./src/services/geminiCall.js";
+import { computeRiskScore } from "./src/lib/riskEngine.js";
 
 dotenv.config();
 
@@ -596,12 +597,14 @@ const wss = new WebSocketServer({ noServer: true });
 wss.on("connection", async (clientWs, request) => {
   console.log("WebSocket client connected to Gemini Live API bridge.");
   let session: any = null;
+  let userId = "";
 
-  // Extract custom API key from URL query parameters if present
+  // Extract custom API key and userId from URL query parameters if present
   let localAi = ai;
   if (request) {
     try {
       const reqUrl = new URL(request.url || "", `http://${request.headers.host || "localhost"}`);
+      userId = reqUrl.searchParams.get("userId") || "";
       const customKey = reqUrl.searchParams.get("key");
       if (customKey && customKey.trim().length > 0) {
         localAi = new GoogleGenAI({
@@ -618,6 +621,41 @@ wss.on("connection", async (clientWs, request) => {
     }
   }
 
+  // Retrieve user-specific tasks to provide as high-fidelity context for Gemini Live
+  let userTasks: any[] = [];
+  if (userId) {
+    userTasks = Object.values(dbData.tasks).filter((t: any) => t && t.userId === userId);
+  }
+
+  // Format the user tasks for a concise system instruction context block
+  const compactTasks = userTasks.map(t => ({
+    id: t.id,
+    title: t.title,
+    deadline: t.deadline,
+    riskZone: t.riskZone,
+    isCompleted: t.subtasks?.every((s: any) => s.done) || false,
+    subtasks: (t.subtasks || []).map((s: any) => ({ id: s.id, title: s.title, done: s.done }))
+  }));
+
+  const systemInstruction = `You are Saarthi (सारथी), the user's active, real-time voice execution assistant and executive coach.
+You are helping the user track milestones, protect their time, and rescue slipping deadlines.
+
+The user's current tasks and subtasks are:
+${JSON.stringify(compactTasks, null, 2)}
+
+Your tone should be highly supportive, calm, encouraging, and extremely pragmatic.
+IMPORTANT Speech Directives:
+- Always speak concisely! Responses should be a single brief sentence or at most two sentences to allow for an exceptionally fast, natural, interactive conversational flow.
+- Never write extensive paragraphs or list multiple items.
+- Avoid developer jargon or references to IDs. Speak naturally to the human user (e.g. "Excellent, I have marked DBMS unit 3 as finished!").
+
+You have access to the following real-time task management tools:
+1. completeTask: Use this to mark a task or a subtask as finished when the user reports completion (e.g., "I completed unit 3" or "finished the syllabus").
+2. snoozeTask: Use this to postpone or reschedule a task by a number of days (e.g., "snooze ML essay by 2 days").
+3. getTasksStatus: Retrieve the current list of tasks and metrics.
+
+Always verbally confirm actions in a warm, encouraging way.`;
+
   try {
     session = await localAi.live.connect({
       model: "gemini-3.1-flash-live-preview",
@@ -626,16 +664,191 @@ wss.on("connection", async (clientWs, request) => {
         speechConfig: {
           voiceConfig: { prebuiltVoiceConfig: { voiceName: "Zephyr" } },
         },
-        systemInstruction: "You are Saarthi (सारथी), an active real-time voice execution assistant. The user is looking to plan, complete, or review their deadlines. Be incredibly supportive, calm, direct, and pragmatic. Respond concisely so we can have a highly natural speech flow.",
+        outputAudioTranscription: {},
+        inputAudioTranscription: {},
+        tools: [
+          {
+            functionDeclarations: [
+              {
+                name: "completeTask",
+                description: "Mark a specific task or an individual subtask as completed.",
+                parameters: {
+                  type: Type.OBJECT,
+                  properties: {
+                    taskId: { type: Type.STRING, description: "The unique ID of the task to update." },
+                    subtaskId: { type: Type.STRING, description: "Optional. The unique ID of the subtask to mark completed. If omitted, the entire task is marked complete." },
+                  },
+                  required: ["taskId"]
+                }
+              },
+              {
+                name: "snoozeTask",
+                description: "Postpone or snooze a specific task by a number of days.",
+                parameters: {
+                  type: Type.OBJECT,
+                  properties: {
+                    taskId: { type: Type.STRING, description: "The unique ID of the task to reschedule." },
+                    days: { type: Type.INTEGER, description: "The number of days to snooze the task by." }
+                  },
+                  required: ["taskId", "days"]
+                }
+              },
+              {
+                name: "getTasksStatus",
+                description: "Retrieve the user's current tasks and overall execution risk metrics.",
+                parameters: {
+                  type: Type.OBJECT,
+                  properties: {},
+                }
+              }
+            ]
+          }
+        ],
+        systemInstruction,
       },
       callbacks: {
-        onmessage: (message: any) => {
+        onmessage: async (message: any) => {
+          // 1. Forward raw audio chunk to the client for playback
           const audio = message.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
           if (audio) {
             clientWs.send(JSON.stringify({ audio }));
           }
+
+          // 2. Forward user transcription chunk
+          const userParts = message.serverContent?.userContent?.parts;
+          if (userParts) {
+            for (const part of userParts) {
+              if (part.text) {
+                clientWs.send(JSON.stringify({ type: "userTranscript", text: part.text }));
+              }
+            }
+            clientWs.send(JSON.stringify({ type: "userFinishedSpeaking" }));
+          }
+
+          // 3. Forward model transcription chunk
+          const modelParts = message.serverContent?.modelTurn?.parts;
+          if (modelParts) {
+            for (const part of modelParts) {
+              if (part.text) {
+                clientWs.send(JSON.stringify({ type: "modelTranscript", text: part.text }));
+              }
+            }
+          }
+
+          // 4. Forward interruption signal
           if (message.serverContent?.interrupted) {
             clientWs.send(JSON.stringify({ interrupted: true }));
+          }
+
+          // 5. Handle Live Function Calling (Productivity Intelligence)
+          if (message.toolCall?.functionCalls) {
+            for (const fc of message.toolCall.functionCalls) {
+              const { name, args, id } = fc;
+              console.log(`Live session executing tool: ${name}`, args);
+              let responseContent: any = { success: false, error: "Unknown error" };
+
+              try {
+                if (name === "completeTask") {
+                  const taskId = args.taskId;
+                  const subtaskId = args.subtaskId;
+                  const task = dbData.tasks[taskId];
+                  if (task) {
+                    let updatedSubtasks = [...task.subtasks];
+                    let msg = "";
+                    if (subtaskId) {
+                      updatedSubtasks = updatedSubtasks.map((s: any) =>
+                        s.id === subtaskId ? { ...s, done: true } : s
+                      );
+                      const sub = task.subtasks.find((s: any) => s.id === subtaskId);
+                      msg = `Subtask "${sub?.title || subtaskId}" of task "${task.title}" completed.`;
+                    } else {
+                      updatedSubtasks = updatedSubtasks.map((s: any) => ({ ...s, done: true }));
+                      msg = `Task "${task.title}" marked as completed.`;
+                    }
+
+                    const tempTask = { ...task, subtasks: updatedSubtasks };
+                    const risk = computeRiskScore(tempTask);
+                    const updatedTask = {
+                      ...task,
+                      subtasks: updatedSubtasks,
+                      sessionsCompleted: updatedSubtasks.filter((s: any) => s.done).length,
+                      riskScore: risk.score,
+                      riskZone: risk.zone,
+                      googleCalendarSynced: false,
+                      lastUpdated: Date.now()
+                    };
+
+                    dbData.tasks[taskId] = updatedTask;
+                    saveDb();
+
+                    const updatedTasks = Object.values(dbData.tasks).filter((t: any) => t && t.userId === userId);
+                    clientWs.send(JSON.stringify({
+                      type: "taskUpdated",
+                      taskId,
+                      action: "complete",
+                      message: msg,
+                      tasks: updatedTasks
+                    }));
+                    responseContent = { success: true, message: msg };
+                  } else {
+                    responseContent = { success: false, error: `Task ID ${taskId} not found.` };
+                  }
+                } else if (name === "snoozeTask") {
+                  const taskId = args.taskId;
+                  const days = Number(args.days);
+                  const task = dbData.tasks[taskId];
+                  if (task) {
+                    const currentDeadline = new Date(task.deadline);
+                    currentDeadline.setDate(currentDeadline.getDate() + days);
+                    const newDeadlineStr = currentDeadline.toISOString();
+
+                    const tempTask = { ...task, deadline: newDeadlineStr };
+                    const risk = computeRiskScore(tempTask);
+                    const updatedTask = {
+                      ...task,
+                      deadline: newDeadlineStr,
+                      riskScore: risk.score,
+                      riskZone: risk.zone,
+                      googleCalendarSynced: false,
+                      lastUpdated: Date.now()
+                    };
+
+                    dbData.tasks[taskId] = updatedTask;
+                    saveDb();
+
+                    const msg = `Task "${task.title}" snoozed by ${days} days. New deadline is ${currentDeadline.toLocaleDateString()}.`;
+                    const updatedTasks = Object.values(dbData.tasks).filter((t: any) => t && t.userId === userId);
+                    clientWs.send(JSON.stringify({
+                      type: "taskUpdated",
+                      taskId,
+                      action: "snooze",
+                      message: msg,
+                      tasks: updatedTasks
+                    }));
+                    responseContent = { success: true, message: msg };
+                  } else {
+                    responseContent = { success: false, error: `Task ID ${taskId} not found.` };
+                  }
+                } else if (name === "getTasksStatus") {
+                  const updatedTasks = Object.values(dbData.tasks).filter((t: any) => t && t.userId === userId);
+                  responseContent = { success: true, tasks: updatedTasks };
+                }
+              } catch (err: any) {
+                console.error("Function call error in Live session:", err);
+                responseContent = { success: false, error: err.message };
+              }
+
+              // Send the tool response back to the Gemini session
+              session.sendToolResponse({
+                functionResponses: [
+                  {
+                    name,
+                    response: { output: responseContent },
+                    id
+                  }
+                ]
+              });
+            }
           }
         },
       },
@@ -655,6 +868,12 @@ wss.on("connection", async (clientWs, request) => {
         session.sendRealtimeInput({
           audio: { data: payload.audio, mimeType: "audio/pcm;rate=16000" },
         });
+      } else if (payload.type === "interrupt") {
+        console.log("Explicit user interruption received from client.");
+        // Sending a blank text input forces Gemini Live to yield and stop its active turn
+        if (session) {
+          session.sendRealtimeInput({ text: "" });
+        }
       }
     } catch (e) {
       console.error("Error processing websocket message chunk:", e);

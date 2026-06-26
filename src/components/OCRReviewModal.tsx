@@ -38,7 +38,7 @@ export default function OCRReviewModal({
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 flex items-center justify-center p-4 z-50 overflow-y-auto">
+      <div className="fixed inset-0 flex items-center justify-center p-4 z-[200] overflow-y-auto">
         {/* Backdrop */}
         <motion.div
           initial={{ opacity: 0 }}

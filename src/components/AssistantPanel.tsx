@@ -16,9 +16,17 @@ import {
   Brain,
   Download,
   AlertTriangle,
+  ChevronDown,
   Send,
   TrendingUp,
-  Bot
+  Bot,
+  Volume2,
+  VolumeX,
+  Settings,
+  Signal,
+  Clock,
+  Activity,
+  CheckCircle
 } from "lucide-react";
 import { ChatMessage } from "../types";
 
@@ -48,6 +56,25 @@ interface AssistantPanelProps {
   onGeneratePoster: () => Promise<void> | void;
   generatedImg: string | null;
   triggerToast: (msg: string) => void;
+  
+  // Rebuilt Voice engine optional props
+  liveState?: "idle" | "initializing" | "connecting" | "listening" | "processing" | "speaking" | "interrupted" | "disconnected" | "reconnecting" | "error";
+  liveErrorMessage?: string;
+  userTranscript?: string;
+  modelTranscript?: string;
+  micVolume?: number;
+  playbackVolume?: number;
+  isMuted?: boolean;
+  onToggleMute?: () => void;
+  latencyMs?: number;
+  connectionQuality?: "excellent" | "good" | "fair" | "poor";
+  conversationDuration?: number;
+  availableMics?: MediaDeviceInfo[];
+  availableSpeakers?: MediaDeviceInfo[];
+  selectedMicId?: string;
+  selectedSpeakerId?: string;
+  onSelectMic?: (deviceId: string) => void;
+  onSelectSpeaker?: (deviceId: string) => void;
 }
 
 export default function AssistantPanel({
@@ -75,10 +102,37 @@ export default function AssistantPanel({
   isGeneratingImg,
   onGeneratePoster,
   generatedImg,
-  triggerToast
+  triggerToast,
+  
+  liveState = "idle",
+  liveErrorMessage = "",
+  userTranscript = "",
+  modelTranscript = "",
+  micVolume = 0,
+  playbackVolume = 0,
+  isMuted = false,
+  onToggleMute,
+  latencyMs = 0,
+  connectionQuality = "excellent",
+  conversationDuration = 0,
+  availableMics = [],
+  availableSpeakers = [],
+  selectedMicId = "",
+  selectedSpeakerId = "",
+  onSelectMic,
+  onSelectSpeaker
 }: AssistantPanelProps) {
   // Chat list scroll ref
   const scrollParentRef = React.useRef<HTMLDivElement>(null);
+  const [isPersonaDropdownOpen, setIsPersonaDropdownOpen] = React.useState(false);
+  const [isMicDropdownOpen, setIsMicDropdownOpen] = React.useState(false);
+  const [isSpeakerDropdownOpen, setIsSpeakerDropdownOpen] = React.useState(false);
+
+  const formatDuration = (sec: number): string => {
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+  };
 
   React.useEffect(() => {
     if (scrollParentRef.current) {
@@ -87,10 +141,10 @@ export default function AssistantPanel({
         behavior: "smooth"
       });
     }
-  }, [chats, isChatSending]);
+  }, [chats, isChatSending, userTranscript, modelTranscript]);
 
   return (
-    <div className="flex flex-col bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl overflow-hidden shadow-sm h-full min-h-[600px] transition-all">
+    <div className="flex flex-col bg-white dark:bg-zinc-900 overflow-hidden h-full transition-all">
       {/* Tab bar header */}
       <div className="flex border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-950/20 p-1 shrink-0">
         <button
@@ -148,18 +202,48 @@ export default function AssistantPanel({
         {activeTab === "chat" && (
           <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
             {/* Context control line */}
-            <div className="bg-zinc-50/50 dark:bg-zinc-950/20 border-b border-zinc-200 dark:border-zinc-800 p-3 text-xs flex flex-wrap items-center justify-between gap-3 text-zinc-700 dark:text-zinc-350">
+            <div className="bg-zinc-50/50 dark:bg-zinc-950/20 border-b border-zinc-200 dark:border-zinc-800 p-3 text-xs flex flex-wrap items-center justify-between gap-3 text-zinc-700 dark:text-zinc-400">
               <div className="flex items-center gap-2">
                 <span className="text-zinc-400 dark:text-zinc-500 font-bold font-mono text-[10px] uppercase">COACH STYLE</span>
-                <select
-                  value={chatPersona}
-                  onChange={(e) => setChatPersona(e.target.value as any)}
-                  className="bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 rounded-lg px-2.5 py-1 text-xs outline-none focus:border-zinc-400 dark:focus:border-zinc-600 font-semibold cursor-pointer"
-                >
-                  <option value="navigator">Calm Strategic Navigator</option>
-                  <option value="shield">Procrastination Shield</option>
-                  <option value="coach">Tough Love Taskmaker</option>
-                </select>
+                <div className="relative z-10">
+                  <button
+                    onClick={() => setIsPersonaDropdownOpen(!isPersonaDropdownOpen)}
+                    className="flex items-center justify-between gap-2 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 rounded-lg px-2.5 py-1 text-xs outline-none focus:border-zinc-400 dark:focus:border-zinc-600 font-semibold cursor-pointer min-w-[170px]"
+                  >
+                    <span>
+                      {chatPersona === "navigator" ? "Calm Strategic Navigator" : chatPersona === "shield" ? "Procrastination Shield" : "Tough Love Taskmaker"}
+                    </span>
+                    <ChevronDown className="w-3 h-3 text-zinc-400" />
+                  </button>
+                  {isPersonaDropdownOpen && (
+                    <>
+                      <div 
+                        className="fixed inset-0" 
+                        onClick={() => setIsPersonaDropdownOpen(false)}
+                      ></div>
+                      <div className="absolute left-0 mt-1 w-full min-w-[170px] bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg z-20 py-1 overflow-hidden font-medium">
+                        <button
+                          onClick={() => { setChatPersona("navigator"); setIsPersonaDropdownOpen(false); }}
+                          className={`w-full text-left px-3 py-1.5 text-xs hover:bg-zinc-50 dark:hover:bg-zinc-700/50 transition-colors ${chatPersona === "navigator" ? "text-indigo-600 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-900/10" : "text-zinc-700 dark:text-zinc-300"}`}
+                        >
+                          Calm Strategic Navigator
+                        </button>
+                        <button
+                          onClick={() => { setChatPersona("shield"); setIsPersonaDropdownOpen(false); }}
+                          className={`w-full text-left px-3 py-1.5 text-xs hover:bg-zinc-50 dark:hover:bg-zinc-700/50 transition-colors ${chatPersona === "shield" ? "text-indigo-600 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-900/10" : "text-zinc-700 dark:text-zinc-300"}`}
+                        >
+                          Procrastination Shield
+                        </button>
+                        <button
+                          onClick={() => { setChatPersona("coach"); setIsPersonaDropdownOpen(false); }}
+                          className={`w-full text-left px-3 py-1.5 text-xs hover:bg-zinc-50 dark:hover:bg-zinc-700/50 transition-colors ${chatPersona === "coach" ? "text-indigo-600 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-900/10" : "text-zinc-700 dark:text-zinc-300"}`}
+                        >
+                          Tough Love Taskmaker
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
 
               <div className="flex items-center gap-3 font-mono text-[9px] font-bold">
@@ -189,16 +273,42 @@ export default function AssistantPanel({
               </div>
             </div>
 
-            {/* Chat Messages Scrolling stream */}
+            {/* Live voice connection status banner inside chat tab */}
+            {isLiveActive && (
+              <div className="bg-cyan-50/60 dark:bg-cyan-950/20 border-b border-cyan-100/80 dark:border-cyan-950/40 px-3.5 py-2 flex items-center justify-between text-xs animate-fade-in shrink-0">
+                <div className="flex items-center gap-2">
+                  <span className={`w-2 h-2 rounded-full ${
+                    liveState === "speaking" ? "bg-cyan-500 animate-pulse shadow-[0_0_6px_rgb(6,182,212)]" :
+                    liveState === "listening" ? "bg-emerald-500 animate-pulse shadow-[0_0_6px_rgb(16,185,129)]" :
+                    "bg-amber-500 animate-bounce"
+                  }`} />
+                  <span className="font-bold text-cyan-800 dark:text-cyan-300 font-mono text-[10px] uppercase tracking-wider">
+                    Saarthi Voice: {liveState === "speaking" ? "Speaking" : liveState === "listening" ? "Listening" : "Thinking"}
+                  </span>
+                </div>
+                <div className="flex items-center gap-3 text-[10px] font-mono font-bold text-cyan-600 dark:text-cyan-400">
+                  <span className="flex items-center gap-1">
+                    <Clock className="w-3 h-3" />
+                    {formatDuration(conversationDuration)}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Signal className="w-3 h-3" />
+                    {latencyMs}ms
+                  </span>
+                </div>
+              </div>
+            )}
+
+             {/* Chat Messages Scrolling stream */}
             <div ref={scrollParentRef} className="flex-1 overflow-y-auto p-5 space-y-4">
-              {chats.length === 0 ? (
+              {chats.length === 0 && (!userTranscript || !userTranscript.trim()) ? (
                 <div className="h-full flex flex-col items-center justify-center text-center p-6 space-y-3.5 my-8">
                   <div className="w-12 h-12 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 rounded-2xl flex items-center justify-center shadow-xs">
                     <Sparkles className="w-5 h-5 text-zinc-800 dark:text-zinc-200" />
                   </div>
                   <div className="space-y-1">
                     <p className="text-sm font-bold font-display text-zinc-900 dark:text-zinc-50">Saarthi Study Companion</p>
-                    <p className="text-[11px] text-zinc-505 dark:text-zinc-400 max-w-[280px] leading-relaxed">
+                    <p className="text-[11px] text-zinc-550 dark:text-zinc-400 max-w-[280px] leading-relaxed">
                       "I'm feeling blocked starting this essay, how do I begin?" or "Give me a checklist to study chapter 4."
                     </p>
                   </div>
@@ -212,7 +322,7 @@ export default function AssistantPanel({
                         key={idx}
                         className={`flex flex-col ${isUser ? "items-end" : "items-start"} animate-fade-in`}
                       >
-                        <span className="text-[9px] font-mono font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wide mb-1 px-1">
+                        <span className="text-[9px] font-mono font-bold text-zinc-400 dark:text-zinc-505 uppercase tracking-wide mb-1 px-1">
                           {isUser ? "You" : `${chatPersona.toUpperCase()} COACH`}
                         </span>
                         <div
@@ -227,6 +337,22 @@ export default function AssistantPanel({
                       </div>
                     );
                   })}
+
+                  {/* Real-time speaking transcript preview */}
+                  {isLiveActive && userTranscript && userTranscript.trim() !== "" && (
+                    <div className="flex flex-col items-end animate-fade-in">
+                      <span className="text-[9px] font-mono font-bold text-cyan-600 dark:text-cyan-400 uppercase tracking-wide mb-1 px-1 flex items-center gap-1.5">
+                        <span className="relative flex h-1.5 w-1.5">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-cyan-500"></span>
+                        </span>
+                        Speaking...
+                      </span>
+                      <div className="p-3.5 rounded-2xl max-w-[85%] text-xs leading-relaxed whitespace-pre-wrap bg-cyan-500/5 dark:bg-cyan-950/20 border border-dashed border-cyan-500/30 text-zinc-700 dark:text-zinc-300 rounded-tr-none shadow-xs animate-pulse">
+                        {userTranscript}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -246,7 +372,7 @@ export default function AssistantPanel({
                           href={url}
                           target="_blank"
                           rel="noreferrer"
-                          className="text-zinc-700 dark:text-zinc-350 hover:text-zinc-950 dark:hover:text-zinc-50 hover:underline font-medium truncate flex items-center gap-1.5"
+                          className="text-zinc-700 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-zinc-50 hover:underline font-medium truncate flex items-center gap-1.5"
                         >
                           <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-mono">{idx + 1}.</span>
                           <span className="truncate">{title}</span>
@@ -268,19 +394,36 @@ export default function AssistantPanel({
 
             {/* Chat bottom input bar */}
             <div className="border-t border-zinc-200 dark:border-zinc-800 p-3.5 bg-zinc-50/50 dark:bg-zinc-950/10 flex gap-2 shrink-0">
-              <input
-                type="text"
-                value={chatInput}
-                onChange={(e) => setChatInput(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && !isChatSending && chatInput.trim() && onSendChatMessage()}
-                placeholder="Message your strategic companion..."
-                className="input-primary flex-grow py-2.5"
-                disabled={isChatSending}
-              />
+              <div className="relative flex-grow flex items-center">
+                <input
+                  type="text"
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && !isChatSending && chatInput.trim() && onSendChatMessage()}
+                  placeholder={isLiveActive ? "Voice active. Speak clearly or type..." : "Message your strategic companion..."}
+                  className="input-primary w-full py-2.5 pr-11"
+                  disabled={isChatSending}
+                />
+                
+                {/* Voice Session toggle inside text box */}
+                <button
+                  type="button"
+                  onClick={onStartLiveCall}
+                  className={`absolute right-2 p-1.5 rounded-lg cursor-pointer transition-all ${
+                    isLiveActive
+                      ? "bg-rose-500 hover:bg-rose-600 text-white animate-pulse shadow-sm"
+                      : "text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                  }`}
+                  title={isLiveActive ? "End Live Voice Connection" : "Start Live Voice Connection"}
+                >
+                  {isLiveActive ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
+                </button>
+              </div>
+
               <button
                 onClick={onSendChatMessage}
                 disabled={isChatSending || !chatInput.trim()}
-                className="btn-primary py-2.5 px-4.5"
+                className="btn-primary py-2.5 px-4.5 shrink-0"
               >
                 <span>Send</span>
                 <Send className="w-3.5 h-3.5" />
@@ -291,75 +434,254 @@ export default function AssistantPanel({
 
         {/* PANEL 2: Real-time Live Audio Duplex Session */}
         {activeTab === "voice" && (
-          <div className="flex-1 flex flex-col p-8 items-center justify-center text-center space-y-6">
-            <div className="relative flex items-center justify-center h-40">
-              {/* Pulsing visual circles */}
-              <AnimatePresence>
-                {isLiveActive && (
-                  <>
-                    <motion.div
-                      initial={{ scale: 0.9, opacity: 0.3 }}
-                      animate={{ scale: 1.4, opacity: 0 }}
-                      exit={{ scale: 0.9, opacity: 0 }}
-                      transition={{ repeat: Infinity, duration: 2.2, ease: "easeInOut" }}
-                      className="absolute w-36 h-36 rounded-full bg-zinc-200 dark:bg-zinc-800"
-                    />
-                    <motion.div
-                      initial={{ scale: 0.9, opacity: 0.4 }}
-                      animate={{ scale: 1.25, opacity: 0 }}
-                      exit={{ scale: 0.9, opacity: 0 }}
-                      transition={{ repeat: Infinity, duration: 2.2, ease: "easeInOut", delay: 0.7 }}
-                      className="absolute w-28 h-28 rounded-full bg-zinc-100 dark:bg-zinc-800/60"
-                    />
-                  </>
-                )}
-              </AnimatePresence>
+          <div className="flex-1 flex flex-col p-5 space-y-4 overflow-y-auto">
+            {/* Connection/State Header */}
+            <div className="flex items-center justify-between bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/50 dark:border-zinc-800/80 p-3 rounded-2xl shrink-0">
+              <div className="flex items-center gap-2">
+                <span className={`w-2.5 h-2.5 rounded-full ${
+                  liveState === "speaking" ? "bg-cyan-500 animate-pulse shadow-[0_0_8px_rgb(6,182,212)]" :
+                  liveState === "listening" ? "bg-emerald-500 animate-pulse shadow-[0_0_8px_rgb(16,185,129)]" :
+                  liveState === "processing" ? "bg-amber-500 animate-bounce" :
+                  liveState === "connecting" || liveState === "initializing" ? "bg-blue-500 animate-pulse" :
+                  liveState === "error" ? "bg-rose-500" : "bg-zinc-400"
+                }`} />
+                <span className="text-[10px] font-bold uppercase tracking-wider font-mono text-zinc-700 dark:text-zinc-300">
+                  {liveState === "idle" && "Ready to Connect"}
+                  {liveState === "initializing" && "Initializing Core..."}
+                  {liveState === "connecting" && "Bridging Connection..."}
+                  {liveState === "listening" && "Listening..."}
+                  {liveState === "processing" && "Thinking..."}
+                  {liveState === "speaking" && "Saarthi Speaking"}
+                  {liveState === "interrupted" && "Interrupted"}
+                  {liveState === "disconnected" && "Session Closed"}
+                  {liveState === "error" && "Engine Fault"}
+                </span>
+              </div>
 
-              <button
-                onClick={onStartLiveCall}
-                className={`w-20 h-20 rounded-full flex items-center justify-center z-10 transition-all hover:scale-105 active:scale-95 shadow-md cursor-pointer ${
-                  isLiveActive
-                    ? "bg-rose-500 text-white shadow-lg shadow-rose-100 dark:shadow-rose-950/45 hover:bg-rose-600"
-                    : "bg-zinc-950 dark:bg-zinc-100 text-white dark:text-zinc-950 hover:bg-zinc-900 dark:hover:bg-zinc-200"
-                }`}
-                title={isLiveActive ? "Disconnect Voice Session" : "Start Live Voice Chat"}
-              >
-                {isLiveActive ? <MicOff className="w-6 h-6 animate-pulse" /> : <Mic className="w-6 h-6 text-white dark:text-zinc-950" />}
-              </button>
+              {isLiveActive && (
+                <div className="flex items-center gap-3 text-[10px] font-mono text-zinc-500 dark:text-zinc-400">
+                  <div className="flex items-center gap-1">
+                    <Clock className="w-3 h-3" />
+                    <span>{formatDuration(conversationDuration)}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Signal className="w-3 h-3" />
+                    <span>{latencyMs}ms</span>
+                  </div>
+                </div>
+              )}
             </div>
 
-            <div className="space-y-2 max-w-sm">
-              <h3 className="text-sm font-bold font-display text-zinc-900 dark:text-zinc-100">Duplex Voice Interface</h3>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
-                Connect directly with our <strong>gemini-3.1-flash-live-preview</strong> model to brainstorm assignments, get tactical schedule reviews, or resolve blocking friction without typing.
-              </p>
-            </div>
-
-            {/* Live session connection status badging */}
-            <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-[10px] font-mono font-bold transition-all ${
-              isLiveActive
-                ? "bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/50 text-emerald-800 dark:text-emerald-400"
-                : "bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400"
-            }`}>
-              <span className={`w-1.5 h-1.5 rounded-full ${isLiveActive ? "bg-emerald-500 animate-ping" : "bg-zinc-400"}`} />
-              <span>{liveLog.toUpperCase()}</span>
-            </div>
-
-            {/* Live Waveform Indicator Canvas simulation */}
-            {isLiveActive && (
-              <div className="w-full max-w-[240px] flex items-center justify-center gap-1.5 h-12 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200/50 dark:border-zinc-800/80 p-3 rounded-xl">
-                {[...Array(12)].map((_, i) => (
-                  <div
-                    key={i}
-                    className="w-1 bg-zinc-900 dark:bg-zinc-100 rounded-full transition-all duration-150 animate-pulse"
-                    style={{
-                      height: `${Math.floor(Math.random() * 26) + 4}px`,
-                      animationDelay: `${i * 80}ms`
-                    }}
-                  />
-                ))}
+            {/* Error Message banner */}
+            {liveState === "error" && liveErrorMessage && (
+              <div className="bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-800/50 p-3 rounded-2xl flex items-start gap-2.5 text-left text-xs text-rose-800 dark:text-rose-400">
+                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                <div className="space-y-0.5">
+                  <p className="font-bold">Execution Error</p>
+                  <p className="opacity-90">{liveErrorMessage}</p>
+                </div>
               </div>
             )}
+
+            {/* Main Interactive Stage */}
+            <div className="flex-1 flex flex-col items-center justify-center bg-zinc-50/50 dark:bg-zinc-950/30 border border-zinc-100 dark:border-zinc-800/40 rounded-3xl p-6 relative overflow-hidden min-h-[160px] shrink-0">
+              {/* Dynamic Live Visualization Wave */}
+              {isLiveActive ? (
+                <div className="flex flex-col items-center justify-center space-y-6 w-full">
+                  {/* Orbs and pulses */}
+                  <div className="relative flex items-center justify-center w-20 h-20">
+                    <motion.div
+                      animate={{
+                        scale: liveState === "speaking" ? [1, 1.1 + playbackVolume * 2, 1] : 
+                               liveState === "listening" ? [1, 1.05 + micVolume * 1.5, 1] : 1,
+                        opacity: liveState === "listening" ? 0.3 : 0.15
+                      }}
+                      transition={{ duration: 0.5, repeat: Infinity }}
+                      className="absolute inset-0 rounded-full bg-cyan-400/20 dark:bg-cyan-500/10 blur-md"
+                    />
+                    
+                    <button
+                      onClick={onStartLiveCall}
+                      className="w-14 h-14 rounded-full bg-rose-500 hover:bg-rose-600 text-white flex items-center justify-center shadow-lg shadow-rose-500/20 transition-all hover:scale-105 active:scale-95 z-10 cursor-pointer"
+                      title="End Session"
+                    >
+                      <MicOff className="w-5 h-5 animate-pulse" />
+                    </button>
+                  </div>
+
+                  {/* Reactive Soundwave Graphic */}
+                  <div className="w-full max-w-[200px] flex items-center justify-center gap-1 h-8">
+                    {[...Array(15)].map((_, i) => {
+                      const vol = liveState === "speaking" ? playbackVolume : liveState === "listening" ? micVolume : 0;
+                      const baseFactor = 4 + Math.sin(i * 0.4) * 8;
+                      const activeHeight = Math.max(4, Math.min(32, baseFactor + vol * 120 * (0.4 + Math.random() * 0.6)));
+                      return (
+                        <motion.div
+                          key={i}
+                          animate={{ height: activeHeight }}
+                          transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                          className={`w-1 rounded-full ${
+                            liveState === "speaking" ? "bg-cyan-500 shadow-[0_0_6px_rgb(6,182,212)]" :
+                            liveState === "listening" ? "bg-emerald-500 shadow-[0_0_6px_rgb(16,185,129)]" :
+                            "bg-zinc-300 dark:bg-zinc-700"
+                          }`}
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center space-y-4">
+                  <button
+                    onClick={onStartLiveCall}
+                    className="w-16 h-16 rounded-full bg-zinc-900 dark:bg-zinc-100 hover:bg-zinc-800 dark:hover:bg-zinc-200 text-white dark:text-zinc-950 flex items-center justify-center shadow-lg transition-all hover:scale-105 active:scale-95 cursor-pointer"
+                  >
+                    <Mic className="w-6 h-6" />
+                  </button>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400">Click to connect duplex voice stream</p>
+                </div>
+              )}
+            </div>
+
+            {/* Conversation Transcripts Panel */}
+            {isLiveActive && (userTranscript || modelTranscript) && (
+              <div className="border border-zinc-200/60 dark:border-zinc-800/60 rounded-2xl overflow-hidden max-h-[160px] flex flex-col bg-white dark:bg-zinc-950 shrink-0">
+                <div className="px-3 py-1.5 bg-zinc-50 dark:bg-zinc-900 border-b border-zinc-200/50 dark:border-zinc-800/50 flex items-center justify-between text-[10px] font-mono text-zinc-500 uppercase">
+                  <span>LIVE CONVERSATION TRANSCRIPT</span>
+                  <Activity className="w-3 h-3 text-cyan-500 animate-pulse" />
+                </div>
+                <div className="p-3 text-left space-y-2.5 overflow-y-auto text-xs leading-relaxed">
+                  {userTranscript && (
+                    <div className="space-y-0.5">
+                      <span className="font-bold text-zinc-500 uppercase text-[9px] tracking-wider block">You</span>
+                      <p className="text-zinc-800 dark:text-zinc-200 bg-zinc-50 dark:bg-zinc-900 px-2.5 py-1.5 rounded-xl border border-zinc-100 dark:border-zinc-900/40">{userTranscript}</p>
+                    </div>
+                  )}
+                  {modelTranscript && (
+                    <div className="space-y-0.5">
+                      <span className="font-bold text-cyan-600 dark:text-cyan-400 uppercase text-[9px] tracking-wider block">Saarthi</span>
+                      <p className="text-zinc-950 dark:text-zinc-50 font-medium bg-cyan-50/20 dark:bg-cyan-950/10 px-2.5 py-1.5 rounded-xl border border-cyan-100/30 dark:border-cyan-950/20">{modelTranscript}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Audio Settings Control Panel */}
+            <div className="space-y-3 bg-zinc-50/30 dark:bg-zinc-950/10 border border-zinc-200/50 dark:border-zinc-800/40 p-4 rounded-2xl text-left shrink-0">
+              <div className="flex items-center justify-between">
+                <h4 className="text-[10px] font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300 flex items-center gap-1.5">
+                  <Settings className="w-3.5 h-3.5" />
+                  <span>Audio Devices</span>
+                </h4>
+                
+                {isLiveActive && onToggleMute && (
+                  <button
+                    onClick={onToggleMute}
+                    className={`p-1 px-2 rounded-lg border flex items-center gap-1.5 text-[9px] font-bold uppercase cursor-pointer transition-colors ${
+                      isMuted
+                        ? "bg-rose-50 dark:bg-rose-950/20 border-rose-200 text-rose-700"
+                        : "bg-zinc-50 dark:bg-zinc-800 border-zinc-200 text-zinc-600 hover:bg-zinc-100"
+                    }`}
+                  >
+                    {isMuted ? <MicOff className="w-3 h-3" /> : <Mic className="w-3 h-3" />}
+                    <span>{isMuted ? "Muted" : "Active"}</span>
+                  </button>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                <div className="space-y-1">
+                  <label className="text-[9px] font-bold text-zinc-500 uppercase tracking-wide">Microphone Input</label>
+                  <div className="relative z-10">
+                    <button
+                      onClick={() => setIsMicDropdownOpen(!isMicDropdownOpen)}
+                      className="w-full flex items-center justify-between text-xs bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-2 rounded-xl focus:outline-none hover:border-zinc-300 dark:hover:border-zinc-700 text-zinc-800 dark:text-zinc-200 cursor-pointer shadow-sm"
+                    >
+                      <span className="truncate">
+                        {availableMics && availableMics.length > 0 && selectedMicId
+                          ? availableMics.find(m => m.deviceId === selectedMicId)?.label || `Microphone ${selectedMicId.slice(0, 5)}`
+                          : "Default System Microphone"}
+                      </span>
+                      <ChevronDown className="w-3 h-3 text-zinc-400 shrink-0 ml-2" />
+                    </button>
+                    {isMicDropdownOpen && (
+                      <>
+                        <div 
+                          className="fixed inset-0" 
+                          onClick={() => setIsMicDropdownOpen(false)}
+                        ></div>
+                        <div className="absolute left-0 bottom-full mb-1 w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-lg z-20 py-1 overflow-hidden font-medium max-h-48 overflow-y-auto">
+                          {availableMics && availableMics.length > 0 ? (
+                            availableMics.map((mic) => (
+                              <button
+                                key={mic.deviceId}
+                                onClick={() => { onSelectMic?.(mic.deviceId); setIsMicDropdownOpen(false); }}
+                                className={`w-full text-left px-3 py-1.5 text-xs hover:bg-zinc-50 dark:hover:bg-zinc-700/50 transition-colors ${selectedMicId === mic.deviceId ? "text-indigo-600 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-900/10" : "text-zinc-700 dark:text-zinc-300"}`}
+                              >
+                                {mic.label || `Microphone ${mic.deviceId.slice(0, 5)}`}
+                              </button>
+                            ))
+                          ) : (
+                            <button
+                              onClick={() => { onSelectMic?.(""); setIsMicDropdownOpen(false); }}
+                              className={`w-full text-left px-3 py-1.5 text-xs hover:bg-zinc-50 dark:hover:bg-zinc-700/50 transition-colors ${!selectedMicId ? "text-indigo-600 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-900/10" : "text-zinc-700 dark:text-zinc-300"}`}
+                            >
+                              Default System Microphone
+                            </button>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[9px] font-bold text-zinc-500 uppercase tracking-wide">Speaker Output</label>
+                  <div className="relative z-10">
+                    <button
+                      onClick={() => setIsSpeakerDropdownOpen(!isSpeakerDropdownOpen)}
+                      className="w-full flex items-center justify-between text-xs bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-2 rounded-xl focus:outline-none hover:border-zinc-300 dark:hover:border-zinc-700 text-zinc-800 dark:text-zinc-200 cursor-pointer shadow-sm"
+                    >
+                      <span className="truncate">
+                        {availableSpeakers && availableSpeakers.length > 0 && selectedSpeakerId
+                          ? availableSpeakers.find(s => s.deviceId === selectedSpeakerId)?.label || `Speaker ${selectedSpeakerId.slice(0, 5)}`
+                          : "Default System Speaker"}
+                      </span>
+                      <ChevronDown className="w-3 h-3 text-zinc-400 shrink-0 ml-2" />
+                    </button>
+                    {isSpeakerDropdownOpen && (
+                      <>
+                        <div 
+                          className="fixed inset-0" 
+                          onClick={() => setIsSpeakerDropdownOpen(false)}
+                        ></div>
+                        <div className="absolute left-0 bottom-full mb-1 w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-lg z-20 py-1 overflow-hidden font-medium max-h-48 overflow-y-auto">
+                          {availableSpeakers && availableSpeakers.length > 0 ? (
+                            availableSpeakers.map((spk) => (
+                              <button
+                                key={spk.deviceId}
+                                onClick={() => { onSelectSpeaker?.(spk.deviceId); setIsSpeakerDropdownOpen(false); }}
+                                className={`w-full text-left px-3 py-1.5 text-xs hover:bg-zinc-50 dark:hover:bg-zinc-700/50 transition-colors ${selectedSpeakerId === spk.deviceId ? "text-indigo-600 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-900/10" : "text-zinc-700 dark:text-zinc-300"}`}
+                              >
+                                {spk.label || `Speaker ${spk.deviceId.slice(0, 5)}`}
+                              </button>
+                            ))
+                          ) : (
+                            <button
+                              onClick={() => { onSelectSpeaker?.(""); setIsSpeakerDropdownOpen(false); }}
+                              className={`w-full text-left px-3 py-1.5 text-xs hover:bg-zinc-50 dark:hover:bg-zinc-700/50 transition-colors ${!selectedSpeakerId ? "text-indigo-600 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-900/10" : "text-zinc-700 dark:text-zinc-300"}`}
+                            >
+                              Default System Speaker
+                            </button>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 

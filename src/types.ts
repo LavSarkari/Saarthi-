@@ -50,6 +50,7 @@ export interface Task {
     advice: string;
   };
   reminderContext?: ReminderContext;
+  lastUpdated?: number;
 }
 
 export interface ChatMessage {

@@ -7,6 +7,23 @@ export function getHoursRemaining(deadlineStr: string): number {
   return Math.max(0, diffMs / (1000 * 60 * 60));
 }
 
+export function formatTimeRemaining(hours: number): string {
+  if (hours <= 0) return "0h";
+  const days = Math.floor(hours / 24);
+  const remainingHours = Math.floor(hours % 24);
+  const mins = Math.round((hours % 1) * 60);
+
+  if (days > 0) {
+    if (remainingHours > 0) return `${days}d ${remainingHours}h`;
+    return `${days}d`;
+  }
+  if (remainingHours > 0) {
+    if (mins > 0) return `${remainingHours}h ${mins}m`;
+    return `${remainingHours}h`;
+  }
+  return `${mins}m`;
+}
+
 export interface RiskAnalysis {
   score: number;
   zone: RiskZone;
