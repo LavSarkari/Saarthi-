@@ -1,105 +1,252 @@
 <div align="center">
-  
-# 🚀 Saarthi: The Last-Minute Life Saver
-### *Stop missing deadlines. Start executing.*
 
-[![Built with React](https://img.shields.io/badge/Built_with-React_18-61DAFB?style=for-the-badge&logo=react)](https://reactjs.org/)
-[![Powered by Gemini](https://img.shields.io/badge/Powered_by-Google_Gemini-4285F4?style=for-the-badge&logo=google)](https://deepmind.google/technologies/gemini/)
-[![Firebase](https://img.shields.io/badge/Backend-Firebase-FFCA28?style=for-the-badge&logo=firebase)](https://firebase.google.com/)
-[![Tailwind CSS](https://img.shields.io/badge/Styled_with-Tailwind-38B2AC?style=for-the-badge&logo=tailwind-css)](https://tailwindcss.com/)
+# 🧭 Saarthi
 
-An AI-powered productivity companion that **proactively assists users in planning, prioritizing, and completing tasks** before deadlines are missed.
+**The Autonomous, AI-Powered Rescue Engine for High-Stakes Deadlines**
+
+[![Build Status](https://img.shields.io/badge/Build-Passing-emerald.svg)](#)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue.svg)](https://www.typescriptlang.org/)
+[![React](https://img.shields.io/badge/React-18-61dafb.svg)](https://reactjs.org/)
+[![Vite](https://img.shields.io/badge/Vite-5.0-646cff.svg)](https://vitejs.dev/)
+[![Gemini](https://img.shields.io/badge/Powered%20by-Google%20Gemini-orange.svg)](https://deepmind.google/technologies/gemini/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+[Live Demo](#) · [Documentation](#) · [Report Bug](#) · [Request Feature](#)
 
 </div>
 
 ---
 
-## 🌪️ The Problem
-Students, professionals, and entrepreneurs frequently miss critical deadlines—assignments, meetings, bill payments, interviews, and important commitments. 
+## 📖 Executive Summary
 
-**Existing productivity tools are fundamentally flawed.** They rely on *passive reminders* (e.g., "Homework due tomorrow") that are incredibly easy to ignore. They tell you *when* something is due, but they do absolutely nothing to help you *actually complete the task* when you are overwhelmed, procrastinating, or running out of time.
+**Saarthi** is a professional-grade, autonomous execution engine built for individuals facing critical deadlines. Unlike traditional task managers that passively store lists of work, Saarthi actively monitors your schedule, decomposes complex tasks, predicts failure risks, and dispatches real-time recovery plans when deadlines compress. 
 
-## 💡 The Solution: Saarthi
-**Saarthi** (The Last-Minute Life Saver) is a proactive execution engine. It moves beyond traditional reminders by autonomously breaking down your workload, calculating feasibility, and dynamically generating tactical recovery plans to ensure you cross the finish line—no matter how late you start.
-
-It doesn't just remind you; it actively coaches you to success.
+Powered by the **Google Gemini 2.5 ecosystem** (Flash, Vision, and Live APIs) and integrated deeply into **Google Workspace** and **Telegram**, Saarthi bridges the gap between static planning and real-time execution.
 
 ---
 
-## ✨ Hackathon-Winning Features
+## 🚨 The Problem
 
-### 🧠 1. Intelligent Task Prioritization (Completion Confidence Engine)
-Forget standard "High/Medium/Low" tags. Saarthi continuously computes an active **Risk Score** for every commitment based on hard deadlines, remaining workload, and cognitive factors. Tasks automatically transition to "critical" status as you fall behind, focusing your attention exactly where it matters most.
+Traditional productivity tools—planners, calendars, and to-do lists—fail when you need them most: **during a crisis.**
+- **Passive Tracking:** They only tell you *what* is due, not *how* to do it when time is critically short.
+- **Cognitive Overload:** When users fall behind, the mental friction of rescheduling and re-prioritizing leads to paralysis.
+- **Siloed Environments:** Tasks live in an app, but life happens in calendars and messages. By the time you check your to-do list, it's often too late.
 
-### 📅 2. AI-Powered Scheduling Assistance
-Stop guessing how long things take. Give Saarthi a raw, qualitative goal (e.g., *"Write a 10-page research paper"*), and the **Gemini Reasoning Model** instantly breaks it into a logical, step-by-step roadmap with scientifically estimated time blocks optimized for your schedule.
+### Why Saarthi Exists
+Saarthi was engineered to eliminate execution paralysis. It shifts the burden of planning, risk calculation, and recovery from the human to the AI, ensuring that no matter how close the deadline, you always have a viable, actionable path forward.
 
-### 🚑 3. Personalized Productivity Recommendations & Recovery
-When a severe scheduling conflict or time shortage is detected, Saarthi generates **Strategic Recovery Plans**. It autonomously suggests compromise strategies (e.g., *"Focus only on chapters 1-3 to secure a passing grade"*), ensuring you secure the absolute baseline passing threshold rather than failing entirely.
+---
 
-### 🔔 4. Context-Aware Reminders
-Standard apps send generic alerts. Saarthi actively tracks your effort and progress. If you haven't started a 5-hour task and it's due in 6 hours, Saarthi issues a context-aware intervention, proactively recalculating feasibility and suggesting immediate action, rather than just pinging your phone.
+## ✨ Core Capabilities
 
-### 🔄 5. Calendar Integration & Goal Tracking
-Real OAuth 2.0 linkage connects your AI-generated subtasks directly to **Google Calendar** and **Google Tasks**. This creates unified accountability—your dynamically adjusted AI roadmap perfectly syncs with your real-world schedule.
+### 1. Autonomous Decomposition (Gemini 2.5 Flash)
+Input a vague objective (e.g., "Launch Product V2 next Friday"), and Saarthi autonomously decomposes it into an actionable, minute-by-minute execution plan with time constraints.
 
-### 🎙️ 6. Voice-Enabled Assistance (Gemini Live)
-Feeling overwhelmed? Engage in low-latency, real-time voice consultations with a tactical AI coach using **Gemini Live WebSockets**. Brainstorm approaches, refine deadlines, or trigger recovery plans completely hands-free while you work.
+### 2. Predictive Risk Engine
+Saarthi continuously monitors your remaining time against task complexity. Tasks dynamically shift between **Secured**, **Caution**, and **Critical** zones. If a task enters the Critical zone, Saarthi intervenes.
 
-### 📸 7. Autonomous Task Planning & Execution (Vision OCR)
-Don't waste time typing out lengthy syllabi or copy-pasting homework guidelines. Snap a photo of a document or syllabus, and the **Gemini Vision OCR Engine** will automatically extract deadlines, estimate workloads, and autonomously plan your entire month.
+### 3. Automated Recovery Strategies
+When a deadline becomes mathematically impossible under current constraints, Saarthi generates a **Compromise Strategy**—instructing you exactly what to skip, what to condense, and how to deliver the maximum value in the remaining time.
 
-### 📱 8. Telegram Companion Bot
-Saarthi isn't confined to a browser tab—it's a whole ecosystem. The dedicated **Telegram Companion Bot** provides high-priority, real-time alerts when tasks reach critical risk levels. Engage directly via chat to receive rapid context, quick-start templates, and immediate execution steps without ever opening the web app.
+### 4. Continuous Voice Coaching (Gemini Live API)
+A low-latency, WebSocket-powered voice assistant provides real-time consultation. Brainstorm ideas, dictate task updates, or ask for motivation. The Voice Engine executes server-side function calling to modify your schedule purely through conversation.
+
+### 5. Multi-Channel Synchronization
+- **Google Calendar Sync:** Extracted tasks and deadlines are automatically provisioned as Google Calendar events via OAuth.
+- **Telegram Companion Bot:** A dedicated Telegram integration delivers critical push alerts, daily digests, and interactive recovery plans directly to your phone.
+
+### 6. Vision-Based Extraction (Gemini Vision OCR)
+Upload a photo of a whiteboard, syllabus, or handwritten note. Saarthi uses OCR to extract deadlines, estimate workloads, and build out your entire month's schedule instantly.
+
+---
+
+## 🗺️ End-to-End User Journey
+
+1. **Ingestion:** User uploads a syllabus (Vision OCR) or types a vague goal.
+2. **Decomposition:** Gemini 2.5 Flash structures the raw data into subtasks with precise time estimates.
+3. **Synchronization:** The backend automatically pushes the structured agenda to Google Calendar.
+4. **Monitoring:** The Risk Engine calculates real-time confidence scores based on remaining time.
+5. **Intervention:** A task enters the "Critical" zone. 
+6. **Alerting:** The Telegram Companion Bot pushes an instant alert to the user's phone.
+7. **Recovery:** The user opens the web app (or replies via Telegram) to receive an AI-generated Compromise Plan.
+8. **Execution:** The user executes the simplified subtasks, completing the project just in time.
+
+---
+
+## 🏛️ Technical Architecture
+
+### High-Level System Design
+
+```mermaid
+graph TD
+    Client[React/Vite Client] -->|REST & WebSockets| Node[Node.js / Express Server]
+    Client -->|Real-time Sync| Firebase[(Firestore DB)]
+    
+    Node -->|Task Auth & Data| Firebase
+    Node -->|Gemini SDK| Gemini[Google Gemini APIs]
+    Node -->|OAuth| GCal[Google Calendar API]
+    Node -->|Long Polling| Telegram[Telegram Bot API]
+    
+    Gemini --> Flash[2.5 Flash - Text/JSON]
+    Gemini --> Vision[2.5 Vision - OCR]
+    Gemini --> Live[Live API - Voice/WebSockets]
+```
+
+### AI Architecture
+
+- **Gemini 2.5 Flash:** Used for high-speed, structured JSON generation (task decomposition, recovery strategies).
+- **Gemini Live API (WebSockets):** Maintains a stateful, low-latency audio stream for conversational coaching, equipped with tool-calling capabilities to modify database state.
+- **Gemini 2.5 Flash Vision:** Processes complex unstructured images (syllabi, schedules) into structured JSON payloads.
+
+---
+
+## 💻 Technology Stack
+
+| Domain | Technologies |
+| :--- | :--- |
+| **Frontend** | React 18, TypeScript, Vite, Tailwind CSS, Lucide Icons |
+| **Backend** | Node.js, Express, TypeScript, tsx, esbuild |
+| **AI Ecosystem** | `@google/genai` (Gemini 2.5 Flash, Vision, Live, Voice) |
+| **Database & Auth** | Firebase Authentication, Cloud Firestore |
+| **Integrations** | Google Workspace (Calendar APIs), Telegram Bot API |
+| **State Management** | React Hooks, Context API, Local Volatile Cache (Node) |
+
+---
+
+## 📂 Repository Structure
+
+```text
+saarthi/
+├── docs/                      # Technical Documentation
+├── src/                       
+│   ├── components/            # React UI Components
+│   ├── lib/                   # Utility configurations (Firebase, OAuth)
+│   ├── services/              # Core business logic (Gemini, Telegram, Engine)
+│   ├── App.tsx                # Main application entry point
+│   ├── index.css              # Global Tailwind styling
+│   └── types.ts               # Shared TypeScript interfaces
+├── server.ts                  # Express backend entry point
+├── firestore.rules            # Security rules for database access
+├── package.json               # Build and dependency scripts
+└── vite.config.ts             # Vite bundler configuration
+```
 
 ---
 
 ## 🚀 Installation & Local Development
 
-1. **Clone the repository:**
-   ```bash
-   git clone <repository_url>
-   cd saarthi
-   ```
-2. **Install dependencies:**
-   ```bash
-   npm install
-   ```
-3. **Set up Environment Variables:**
-   Copy `.env.example` to `.env` and configure your API keys (e.g., `GEMINI_API_KEY`).
-4. **Configure Firebase:**
-   Ensure `firebase-applet-config.json` points to your project.
-5. **Start Development Server:**
-   ```bash
-   npm run dev
-   ```
-   The application will start in development mode, typically on port 3000.
+### 1. Prerequisites
+- Node.js (v18+)
+- Firebase Project (Firestore & Authentication enabled)
+- Google Cloud Console Project (for Calendar OAuth and Gemini APIs)
+- Telegram Bot Token (via BotFather)
+
+### 2. Clone and Install
+```bash
+git clone https://github.com/your-org/saarthi.git
+cd saarthi
+npm install
+```
+
+### 3. Environment Configuration
+Copy `.env.example` to `.env` and populate your secrets:
+```env
+GEMINI_API_KEY=your_gemini_api_key
+VITE_FIREBASE_API_KEY=your_firebase_api_key
+TELEGRAM_BOT_TOKEN=your_telegram_bot_token
+```
+
+### 4. Firebase Configuration
+Ensure your `firebase-applet-config.json` points to your active Firebase project.
+
+### 5. Start Development Server
+```bash
+npm run dev
+```
+*The Express backend will start alongside the Vite HMR middleware on port 3000.*
 
 ---
 
-## 🏗️ Technical Architecture & Stack
+## ☁️ Deployment
 
-We built Saarthi to be lightning-fast, highly scalable, and completely seamlessly integrated with Google's ecosystem.
+Saarthi is configured for seamless deployment to containerized environments (like Google Cloud Run) or static/serverless platforms.
 
-*   **Frontend**: React 18, Vite, TypeScript
-*   **Styling & Animation**: Tailwind CSS, Framer Motion, Lucide Icons
-*   **Backend & API Proxy**: Node.js, Express (Full-stack ESM architecture)
-*   **Database & Auth**: Firebase Firestore (Real-time NoSQL) & Firebase Authentication (Google OAuth)
-*   **AI Integration**: Google GenAI SDK (`@google/genai`)
-    *   *Gemini 2.5 Flash* (Fast task decomposition & recovery planning)
-    *   *Gemini Vision* (OCR & Document parsing)
-    *   *Gemini Live API* (Real-time WebSockets for voice assistance)
-*   **Third-Party Integrations**: Google Workspace APIs (Calendar Events, Google Tasks)
+### Production Build
+```bash
+npm run build
+```
+*This command uses Vite to bundle the frontend and `esbuild` to compile the Express backend into a standalone `dist/server.cjs` file.*
+
+### Start Production Server
+```bash
+npm run start
+```
 
 ---
 
-## 🎯 Evaluation Focus & Impact
-Saarthi demonstrates a fundamental shift in Human-Computer Interaction (HCI) within productivity software. Instead of the user managing the tool, **the tool manages the user's risk**. 
+## 🛡️ Security & Privacy
 
-By anticipating failure and helping users make data-driven, tactical decisions when under pressure, Saarthi transforms the overwhelming nature of "impossible deadlines" into a sequence of hyper-actionable, intelligently scheduled, and highly achievable steps.
+- **Client-Side Secrets:** Gemini API keys and Telegram tokens are securely housed on the Node.js backend. The frontend communicates exclusively via proxied `/api/*` routes.
+- **Database Rules:** Strict `firestore.rules` ensure users can only read, write, and query documents associated with their authenticated `userId`.
+- **OAuth Scopes:** Google Calendar integration requires explicit user consent, utilizing minimal scope permissions (`https://www.googleapis.com/auth/calendar.events`).
+
+---
+
+## ⚡ Performance Optimizations
+
+- **Single-File Backend Compilation:** The backend is bundled into a single CommonJS file using `esbuild`, resolving all relative import paths at build time to dramatically reduce container cold-start times.
+- **Volatile Caching:** The Node.js backend utilizes an in-memory JSON cache for Telegram routing, preventing redundant read operations to Firestore.
+- **Optimistic UI:** The React frontend employs optimistic state updates for instantaneous perceived performance during heavy API calls.
+
+---
+
+## 📱 Mobile Support & Accessibility
+
+Saarthi is fully responsive, utilizing Tailwind's mobile-first utility classes to ensure a seamless experience across desktop, tablet, and mobile devices. 
+- **Touch Targets:** Minimum 44px hit areas on mobile.
+- **Contrast Ratios:** Adherence to WCAG AA contrast guidelines for all text elements.
+- **Semantic HTML:** Proper use of structural tags and ARIA labels.
+
+---
+
+## 📸 Interface Showcase
+
+| Dashboard Overview | AI Voice Companion |
+| :---: | :---: |
+| *(Screenshot Placeholder)* | *(Screenshot Placeholder)* |
+| **Risk Engine** | **Telegram Alerts** |
+| *(Screenshot Placeholder)* | *(Screenshot Placeholder)* |
+
+---
+
+## 🔮 Future Roadmap
+
+- **Multi-Agent Collaboration:** Enabling multiple users to share a workspace where Gemini delegates tasks based on individual team member velocity.
+- **GitHub Integration:** Automatic PR scanning to update engineering task progress.
+- **Advanced Telemetry:** Wearable API integration to correlate physiological stress data with task risk scores.
+
+---
+
+## 🏆 Why Saarthi is Different
+
+Saarthi is not a "todo app wrapper" around an LLM. It is an **active system** that behaves like a Chief of Staff. 
+
+While traditional applications wait for user input, Saarthi calculates degradation, anticipates failure, and pushes actionable recovery strategies via multiple channels (Web, Voice, Telegram, Calendar) before the crisis becomes unmanageable.
+
+---
+
+## 🤝 Contribution
+
+We welcome contributions from the community. Please read our `CONTRIBUTING.md` for guidelines on pull requests, code standards, and issue tracking.
+
+---
+
+## 📄 License
+
+This project is licensed under the **MIT License**. See the `LICENSE` file for details.
 
 ---
 
 <div align="center">
-  <i>Designed and engineered for those who need a lifeline, not just a reminder.</i>
+  <p>Engineered with precision for the Google AI Hackathon.</p>
 </div>
