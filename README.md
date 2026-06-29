@@ -17,15 +17,15 @@
 
 ---
 
-## 📖 Executive Overview
-
-**Saarthi** is an AI Execution Operating System. It is an adaptive engine built to solve a specific, pervasive problem: **the execution gap**.
+## 📖 The Execution Paradigm Shift
 
 The market is saturated with software that optimizes planning. Todoist, Motion, Notion, and Google Tasks are excellent at storing information. But people rarely fail because they forgot. They fail due to procrastination, overwhelm, perfectionism, poor estimation, momentum collapse, or burnout. 
 
-Traditional software manages time. **Saarthi manages execution.**
+**Saarthi is an AI Execution Operating System.** It marks a fundamental category transition: from tools that organize work to an engine that ensures you *finish* it.
 
-Powered by the **Google Gemini ecosystem** and deeply integrated with **Google Workspace** and **Telegram**, Saarthi bridges the gap between static planning and real-time completion. It is a system that learns your behavior, predicts execution risk, and autonomously recalculates your path forward.
+Traditional software manages time and information. **Saarthi manages behavior and execution.**
+
+Powered by the **Google Gemini ecosystem** and deeply integrated with **Google Workspace** and **Telegram**, Saarthi bridges the gap between static planning and real-time completion. It is an active system that learns your behavior, predicts execution risk, and autonomously recalculates your path forward.
 
 ---
 
@@ -42,36 +42,35 @@ Saarthi exists to help you **finish work**, not simply organize it. It shifts th
 
 ---
 
-## ✨ The Five Hero Capabilities
+## ✨ The Four Core Execution Systems
 
-Saarthi's architecture revolves around five flagship capabilities that ensure execution.
+Saarthi's architecture abandons traditional to-do lists in favor of four flagship execution systems.
 
-### 1. Brain Dump (Messy Thoughts to Structured Commitments)
-Capture chaotic, unstructured intentions via text, voice, or image. Input a vague objective or upload a photo of a whiteboard, and Saarthi's AI engine extracts the underlying requirements, instantly transforming them into structured, trackable commitments.
+### 1. Adaptive Planning Engine
+Saarthi autonomously decomposes massive, overwhelming goals into realistic execution plans. Instead of static schedules that break the moment you fall behind, **plans evolve daily**. It breaks down complex commitments into minute-by-minute subtasks, perfectly sized to bypass procrastination and build immediate momentum.
 
-### 2. Adaptive AI Planning (Goals to Execution Plans)
-Saarthi autonomously decomposes massive, overwhelming goals into realistic execution plans. It breaks down complex commitments into minute-by-minute subtasks, perfectly sized to bypass procrastination and build immediate momentum.
+### 2. Execution Engine & Emotional Intelligence
+Traditional apps send a cold "Task Due" ping. Saarthi recognizes overwhelm. When it detects execution paralysis or momentum loss, the Execution Engine intervenes with emotional intelligence *(e.g., "Looks like today got overwhelming. Let's rebuild tomorrow.")*. It negotiates the smallest possible step to simply help you *begin*.
 
-### 3. Execution Activation (Overcoming Paralysis)
-When Saarthi detects execution paralysis or momentum loss, the Activation Engine intervenes. It doesn't just remind you to work; it generates tiny, frictionless starting points. It negotiates the smallest possible step to simply help you *begin*.
+### 3. Recovery OS & Decision Matrix
+When life goes wrong and deadlines become mathematically impossible, Saarthi doesn't just tell you to work harder. The Recovery OS acts as a ruthless decision engine focused on what you should **not** do. It generates a Compromise Strategy *(e.g., "Deadline impossible? Drop Feature X. Finish Core. Secure the passing grade.")* to deliver maximum value in the remaining time.
 
-### 4. Recovery OS (Rebuilding the Week)
-When life goes wrong and deadlines become mathematically impossible, Saarthi doesn't just turn tasks red. The Recovery OS generates a Compromise Strategy—instructing you exactly what to skip, what to condense, and how to deliver the maximum value in the remaining time.
-
-### 5. Behavioral Intelligence (Continuous Adaptation)
-Saarthi continuously learns how you actually work. It monitors focus patterns, completion rates, and fatigue levels, building a private Learning Profile. Every future plan, schedule, and intervention is optimized against your historical behavior.
+### 4. Behavioral Intelligence & Memory
+Saarthi continuously learns how you actually work. It monitors focus patterns, completion rates, and fatigue levels, building a private Learning Profile. Every future plan is optimized against your historical behavior *(e.g., "I noticed you usually finish coding after dinner, but every Friday your productivity drops. Let's shift this deadline.")*.
 
 ---
 
-## 🌐 The Supporting Ecosystem
+## 🌐 The Supporting Ecosystem & Tech Stack
 
-These core capabilities are powered by a robust ecosystem of integrated technologies:
+These core systems are powered by a robust ecosystem of integrated technologies, built primarily on Google's AI and Cloud stack:
 
 - **Predictive Risk Engine:** Continuously computes the mathematical probability of completion in real-time, shifting commitments between Secured, Caution, and Critical zones.
-- **Continuous Voice Coaching:** A low-latency, WebSocket-powered Gemini Live integration provides real-time consultation. Brainstorm, update states, or overcome blocks through conversation.
-- **Telegram Companion:** A dedicated integration delivers critical alerts, daily briefings, evening reflections, and interactive recovery plans directly to your phone.
-- **Google Calendar Synchronization:** Extracted milestones are seamlessly provisioned and synchronized with your Google Calendar.
-- **Insights & Analytics:** Deep analytics on your execution velocity, focus blocks, and behavioral trends.
+- **Google Gemini 2.5 Flash:** The core reasoning engine behind the Adaptive Planning and Behavioral Intelligence systems.
+- **Google Gemini Live (WebSockets):** A low-latency integration providing real-time voice consultations. Brainstorm, update states, or overcome blocks through conversation.
+- **Google Gemini Vision:** Processes complex unstructured images (syllabi, schedules) into actionable structured payloads.
+- **Firebase Authentication & Cloud Firestore:** Secure, real-time database infrastructure to maintain the user's Behavioral Profile and execution state.
+- **Telegram Companion Bot:** A Node.js driven integration delivering critical alerts, daily briefings, evening reflections, and interactive recovery plans directly to your phone.
+- **Google Calendar Synchronization:** Extracted milestones are seamlessly provisioned and synchronized with your Google Calendar via OAuth.
 
 ---
 

@@ -2955,9 +2955,9 @@ export default function App() {
             <nav className="flex items-center gap-2 p-1.5">
               {[
                 { id: "workspace", label: "Home", icon: Activity },
-                { id: "planner", label: "New", icon: Plus },
+                { id: "planner", label: "Brain Dump", icon: Plus },
                 { id: "tasks", label: "Execution", icon: CheckSquare },
-                { id: "engagement", label: "Insights", icon: BarChart },
+                { id: "engagement", label: "Behavior", icon: BarChart },
               ].map((tab) => {
                 const Icon = tab.icon;
                 return (
@@ -3134,10 +3134,10 @@ export default function App() {
                   <div className="mb-5 hidden sm:block">
                     <h2 className="text-base font-semibold font-display text-zinc-950 dark:text-zinc-50 mb-1 flex items-center gap-2">
                       <Brain className="w-5 h-5 text-zinc-700 dark:text-zinc-300" />
-                      Commitment Planner
+                      Brain Dump
                     </h2>
                     <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
-                      Declare an upcoming milestone or upload a syllabus to let
+                      Capture chaotic, unstructured intentions via text, voice, or image. Let
                       Saarthi auto-decompose and structure your timeline.
                     </p>
                   </div>
@@ -3147,13 +3147,13 @@ export default function App() {
                     <div className="lg:col-span-7 flex flex-col justify-between gap-4 flex-1">
                       <div className="space-y-2 flex-1 flex flex-col">
                         <span className="hidden sm:block text-[10px] font-mono uppercase tracking-wider text-zinc-500 dark:text-zinc-400 font-semibold">
-                          1. Natural Intention Entry
+                          1. Unstructured Intention Entry
                         </span>
                         <div className="relative flex-1 min-h-[150px] sm:min-h-[90px]">
                           <textarea
                             value={newCommitment}
                             onChange={(e) => setNewCommitment(e.target.value)}
-                            placeholder="What do you need to accomplish? Type, paste, or upload a syllabus..."
+                            placeholder="Brain dump what you need to accomplish... type, paste, or upload a syllabus..."
                             className="w-full h-full bg-zinc-50/50 sm:bg-zinc-50/50 dark:bg-zinc-950/25 border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 focus:border-zinc-900 dark:focus:border-zinc-300 focus:bg-white dark:focus:bg-zinc-900 rounded-xl sm:rounded-xl p-4 pb-14 sm:pb-4 text-sm sm:text-xs text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 outline-none resize-none min-h-[150px] sm:min-h-[90px] transition-all"
                           />
                           <div className="absolute bottom-3 right-3 flex items-center gap-2 sm:hidden">
@@ -3292,7 +3292,7 @@ export default function App() {
                           <Zap className="h-8 w-8 sm:h-10 sm:w-10 text-rose-500 animate-pulse" />
                         </div>
                         <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-zinc-900 dark:text-zinc-50 mb-3">
-                          Activation Ready
+                          Activation Engine Triggered
                         </h2>
                         
                         <div className="bg-rose-50 dark:bg-rose-950/20 rounded-xl p-4 mb-6 text-left border border-rose-100 dark:border-rose-900/30">
@@ -3314,7 +3314,7 @@ export default function App() {
                             onClick={() => setIsActivationModalOpen(true)}
                             className="w-full bg-rose-600 hover:bg-rose-700 text-white font-bold py-3.5 sm:py-4 rounded-xl transition-all cursor-pointer shadow-md flex items-center justify-center gap-2 group"
                           >
-                            Launch Sequence
+                            Launch Activation Engine
                             <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                           </button>
                           
@@ -3450,6 +3450,19 @@ export default function App() {
                     actionText: "Add to Calendar",
                     icon: Calendar,
                     onClick: () => handleSyncToGoogleCalendar(unsyncedTask),
+                  });
+                }
+
+                if (!telegramChatId) {
+                  recommendationsList.push({
+                    title: "Enable remote execution",
+                    description: "Connect Telegram to interact with your execution engine via text and voice anywhere.",
+                    actionText: "Connect Telegram",
+                    icon: MessageSquare,
+                    onClick: () => {
+                      setActiveSettingsTab("telegram");
+                      setShowSettingsModal(true);
+                    }
                   });
                 }
 
@@ -3619,14 +3632,24 @@ export default function App() {
                 return (
                   <div className="flex flex-col gap-5 sm:gap-8 w-full max-w-5xl mx-auto py-1 sm:py-2 animate-fade-in">
                     {/* 1. Greeting Section */}
-                    <div className="space-y-0.5 sm:space-y-1">
-                      <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-                        {greetingWord}, {userName}
-                      </h1>
-                      <p className="text-zinc-500 dark:text-zinc-400 text-[11px] sm:text-xs">
-                        Your quiet executive assistant for keeping pacing steady
-                        and milestone buffers secure.
-                      </p>
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <div className="space-y-0.5 sm:space-y-1">
+                        <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
+                          {greetingWord}, {userName}
+                        </h1>
+                        <p className="text-zinc-500 dark:text-zinc-400 text-[11px] sm:text-xs">
+                          Your active execution engine for managing behavior and securing completion.
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setIsAdaptiveModalOpen(true)}
+                          className="flex items-center justify-center gap-2 bg-indigo-50 dark:bg-indigo-500/10 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-500/20 py-2 px-4 rounded-xl text-xs font-semibold transition-all cursor-pointer shadow-sm"
+                        >
+                          <Zap className="w-3.5 h-3.5" />
+                          Adaptive Planning Engine
+                        </button>
+                      </div>
                     </div>
 
                     {/* 2. Today's Focus (Emotional Centerpiece) */}
@@ -3796,7 +3819,7 @@ export default function App() {
                           <div className="flex items-center gap-3 shrink-0">
                             <div className="text-right">
                               <span className="text-[10px] text-zinc-400 font-medium block">
-                                Paced buffer average
+                                Execution Confidence
                               </span>
                               <span className="text-lg font-bold font-sans">
                                 {avgConfidence}%
@@ -3846,13 +3869,13 @@ export default function App() {
 
                         <div className="p-4 border border-zinc-200 dark:border-zinc-800 rounded-xl bg-white dark:bg-zinc-900/60 shadow-xxs text-center">
                           <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-medium">
-                            Recovery assistance active
+                            Recovery OS Active
                           </span>
                           <span className="text-2xl font-bold text-zinc-900 dark:text-zinc-50 mt-1 block font-sans">
                             {recoveryCount}
                           </span>
                           <p className="text-[10px] text-zinc-500 mt-1">
-                            Timeline safety actions
+                            Active rescue plans
                           </p>
                         </div>
                       </div>
@@ -4024,7 +4047,7 @@ export default function App() {
                           </span>
                           <div>
                             <h3 className="text-sm font-semibold text-amber-900 dark:text-amber-300">
-                              Pacing recovery center
+                              Recovery OS
                             </h3>
                             <p className="text-[11px] text-amber-600 dark:text-amber-400 font-medium">
                               Calm tactical support & pacing compromise
@@ -4214,7 +4237,7 @@ export default function App() {
                     </div>
                     <div>
                       <h2 className="text-xl font-bold font-display text-zinc-950 dark:text-zinc-50">
-                        All Tasks
+                        Execution Overview
                       </h2>
                       <p className="text-xs text-zinc-500">
                         Your full list of commitments and progress.
@@ -4458,8 +4481,8 @@ export default function App() {
           {[
             { id: "workspace", icon: Activity, label: "Home" },
             { id: "tasks", icon: CheckSquare, label: "Execution" },
-            { id: "planner", icon: Plus, label: "New" },
-            { id: "engagement", icon: BarChart, label: "Insights" },
+            { id: "planner", icon: Plus, label: "Brain Dump" },
+            { id: "engagement", icon: BarChart, label: "Behavior" },
             { id: "more", icon: Menu, label: "More" },
           ].map((tab) => {
             const isActive = tab.id !== "more" ? currentView === tab.id : false;

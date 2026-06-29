@@ -101,11 +101,11 @@ export default function EngagementInsights({ userId, onNavigateToBrain }: Engage
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl md:text-4xl font-black tracking-tight text-zinc-900 dark:text-zinc-50 flex items-center gap-3 font-display">
-            <Sparkles className="h-8 w-8 text-indigo-500" />
-            Progress
+            <Brain className="h-8 w-8 text-indigo-500" />
+            Behavioral Intelligence
           </h1>
           <p className="text-base text-zinc-500 dark:text-zinc-400 mt-3 max-w-xl leading-relaxed">
-            What your AI has learned about your workflow recently. Use this to track your momentum and habits.
+            Saarthi is continuously learning how you execute. It monitors your completion rates, focus duration, and friction patterns to optimize future plans.
           </p>
         </div>
         <button

@@ -5,10 +5,10 @@ Saarthi is an AI Execution Operating System designed for ambitious knowledge wor
 
 ## The Five Hero Capabilities
 - **Brain Dump**: Capture chaotic, unstructured intentions via text, voice, or image, and transform them into structured commitments.
-- **Adaptive AI Planning**: Autonomously decompose massive goals into realistic, minute-by-minute execution plans.
-- **Recovery OS**: When life goes wrong, generate a Compromise Strategy to salvage the deadline and rebuild the week.
-- **Execution Activation Engine**: Detect execution paralysis and generate tiny, frictionless starting points to build immediate momentum.
-- **Behavioral Intelligence**: Continuously learn the user's focus patterns, completion rates, and fatigue levels to optimize future interventions.
+- **Adaptive AI Planning**: Autonomously decompose massive goals into realistic, minute-by-minute execution plans. Instead of static schedules, plans evolve daily.
+- **Recovery OS & Decision Engine**: When life goes wrong, the AI acts as a decision engine focused on what NOT to do. It generates a Compromise Strategy (e.g., "Deadline impossible? Drop Feature X. Finish Core.") to salvage the deadline and rebuild the week.
+- **Execution Activation & Emotional Intelligence**: Detect execution paralysis and intervene emotionally (e.g., "Looks like today got overwhelming. Let's rebuild tomorrow.") to generate tiny, frictionless starting points and build immediate momentum.
+- **AI Behavioral Memory**: Continuously learn the user's focus patterns, completion rates, and fatigue levels to optimize future interventions (e.g., "You usually finish coding after dinner, but your productivity drops on Fridays.").
 
 ## Supporting Ecosystem
 - **Predictive Risk Engine:** Continuously computes the mathematical probability of completion in real-time.

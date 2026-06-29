@@ -30,6 +30,7 @@ import {
   RotateCcw,
   MessageCircle,
   LayoutDashboard,
+  ArrowDown,
 } from "lucide-react";
 
 interface LandingPageProps {
@@ -497,15 +498,25 @@ export default function LandingPage({
         className="py-24 border-t border-white/5 bg-[#030303] relative z-10"
       >
         <div className="max-w-6xl mx-auto px-6 space-y-12">
-          <div className="text-center max-w-2xl mx-auto space-y-3">
-            <h2 className="text-xs font-mono text-indigo-400 tracking-wider uppercase font-semibold">
-              The Execution Gap
-            </h2>
-            <h3 className="text-3xl md:text-5xl font-bold font-display tracking-tight text-white">
-              Reminders don't finish the work.
-            </h3>
-            <p className="text-slate-400 text-xs md:text-sm leading-relaxed">
-              Traditional productivity software assumes humans are perfectly disciplined. It stores tasks and sends notifications. When friction spikes and schedules overflow, traditional systems fail completely. Saarthi learns your behavior and continuously renegotiates your path to success.
+          <div className="text-center max-w-3xl mx-auto space-y-8">
+            <div className="space-y-3">
+              <h2 className="text-xs font-mono text-indigo-400 tracking-wider uppercase font-semibold">
+                The Execution Gap
+              </h2>
+              <h3 className="text-3xl md:text-5xl font-bold font-display tracking-tight text-white leading-tight">
+                "I plan everything perfectly and still miss deadlines."
+              </h3>
+            </div>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-left">
+              <div className="p-4 rounded-2xl bg-white/2 border border-white/5 flex items-center text-xs text-slate-300 font-medium hover:border-indigo-500/20 transition-colors">I keep postponing important work.</div>
+              <div className="p-4 rounded-2xl bg-white/2 border border-white/5 flex items-center text-xs text-slate-300 font-medium hover:border-indigo-500/20 transition-colors">One bad day ruins my whole week.</div>
+              <div className="p-4 rounded-2xl bg-white/2 border border-white/5 flex items-center text-xs text-slate-300 font-medium hover:border-indigo-500/20 transition-colors">I know what to do but can't start.</div>
+              <div className="p-4 rounded-2xl bg-red-500/5 border border-red-500/10 flex items-center text-xs text-red-300/80 font-medium">My reminder apps only make me feel guilty.</div>
+            </div>
+
+            <p className="text-slate-400 text-sm md:text-base leading-relaxed max-w-2xl mx-auto pt-4">
+              Traditional productivity apps assume you always have motivation. They assume you estimate work perfectly and that life never interrupts. They believe reminders solve procrastination. <strong className="text-white font-normal">Reality proves otherwise.</strong>
             </p>
           </div>
 
@@ -631,6 +642,251 @@ export default function LandingPage({
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 2.5 WHY SAARTHI FEELS DIFFERENT */}
+      <section className="py-24 border-t border-white/5 bg-black relative z-10">
+        <div className="max-w-6xl mx-auto px-6 space-y-12">
+          <div className="text-center max-w-2xl mx-auto space-y-3">
+            <h2 className="text-xs font-mono text-indigo-400 tracking-wider uppercase font-semibold">
+              Beyond Planning
+            </h2>
+            <h3 className="text-3xl md:text-5xl font-bold font-display tracking-tight text-white">
+              Why Saarthi Feels Different.
+            </h3>
+            <p className="text-slate-400 text-xs md:text-sm leading-relaxed">
+              Traditional apps optimize organization. Saarthi optimizes execution.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start pt-6">
+            <div className="space-y-6">
+              <h4 className="text-xl font-bold text-slate-400 text-center">Traditional Productivity</h4>
+              <div className="space-y-4 text-sm font-mono text-slate-500">
+                <div className="flex flex-col items-center gap-2">
+                  <div className="w-full max-w-[280px] p-4 border border-white/5 rounded-xl text-center bg-white/2">Task Created</div>
+                  <ArrowDown className="w-4 h-4" />
+                  <div className="w-full max-w-[280px] p-4 border border-white/5 rounded-xl text-center bg-white/2">Reminder</div>
+                  <ArrowDown className="w-4 h-4" />
+                  <div className="w-full max-w-[280px] p-4 border border-white/5 rounded-xl text-center bg-white/2">Ignored</div>
+                  <ArrowDown className="w-4 h-4" />
+                  <div className="w-full max-w-[280px] p-4 border border-red-500/20 rounded-xl text-center bg-red-500/5 text-red-400">Task Becomes Overdue</div>
+                  <ArrowDown className="w-4 h-4" />
+                  <div className="w-full max-w-[280px] p-4 border border-white/5 rounded-xl text-center bg-white/2">User Feels Guilty</div>
+                  <ArrowDown className="w-4 h-4" />
+                  <div className="w-full max-w-[280px] p-4 border border-white/5 rounded-xl text-center bg-white/2">Stops Using App</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-6 mt-12 md:mt-0">
+              <h4 className="text-xl font-bold text-white text-center">Saarthi Execution OS</h4>
+              <div className="space-y-4 text-sm font-mono text-indigo-300">
+                <div className="flex flex-col items-center gap-2">
+                  <div className="w-full max-w-[280px] p-4 border border-indigo-500/20 rounded-xl text-center bg-indigo-500/5">Task Created</div>
+                  <ArrowDown className="w-4 h-4 text-indigo-500" />
+                  <div className="w-full max-w-[280px] p-4 border border-indigo-500/20 rounded-xl text-center bg-indigo-500/5">AI Decomposition</div>
+                  <ArrowDown className="w-4 h-4 text-indigo-500" />
+                  <div className="w-full max-w-[280px] p-4 border border-indigo-500/20 rounded-xl text-center bg-indigo-500/5">Adaptive Planning</div>
+                  <ArrowDown className="w-4 h-4 text-indigo-500" />
+                  <div className="w-full max-w-[280px] p-4 border border-indigo-500/20 rounded-xl text-center bg-indigo-500/5">Behavior Learning</div>
+                  <ArrowDown className="w-4 h-4 text-indigo-500" />
+                  <div className="w-full max-w-[280px] p-4 border border-indigo-500/20 rounded-xl text-center bg-indigo-500/5">Execution Monitoring</div>
+                  <ArrowDown className="w-4 h-4 text-indigo-500" />
+                  <div className="w-full max-w-[280px] p-4 border border-indigo-500/20 rounded-xl text-center bg-indigo-500/5">Activation Engine</div>
+                  <ArrowDown className="w-4 h-4 text-indigo-500" />
+                  <div className="w-full max-w-[280px] p-4 border border-indigo-500/20 rounded-xl text-center bg-indigo-500/5">Recovery OS</div>
+                  <ArrowDown className="w-4 h-4 text-emerald-500" />
+                  <div className="w-full max-w-[280px] p-4 border border-emerald-500/20 rounded-xl text-center bg-emerald-500/10 text-emerald-400 font-bold">Task Completed</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 2.6 THE WHAT IF SECTION */}
+      <section className="py-24 border-t border-white/5 bg-[#030303] relative z-10">
+        <div className="max-w-6xl mx-auto px-6 space-y-12">
+          <div className="text-center max-w-2xl mx-auto space-y-3">
+            <h2 className="text-xs font-mono text-indigo-400 tracking-wider uppercase font-semibold">
+              A New Paradigm
+            </h2>
+            <h3 className="text-3xl md:text-5xl font-bold font-display tracking-tight text-white">
+              What If Software Actually Helped?
+            </h3>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pt-6">
+            <div className="p-8 bg-white/2 border border-white/5 rounded-3xl space-y-5 flex flex-col hover:border-indigo-500/20 transition-all text-left">
+              <h4 className="text-lg font-medium text-white tracking-tight leading-snug">What if your planner noticed you were overwhelmed before you did?</h4>
+              <ArrowDown className="w-5 h-5 text-indigo-400 opacity-50" />
+              <div className="text-sm font-bold text-indigo-300">Activation Engine</div>
+            </div>
+            
+            <div className="p-8 bg-white/2 border border-white/5 rounded-3xl space-y-5 flex flex-col hover:border-indigo-500/20 transition-all text-left">
+              <h4 className="text-lg font-medium text-white tracking-tight leading-snug">What if missing one study session didn't destroy your entire week?</h4>
+              <ArrowDown className="w-5 h-5 text-indigo-400 opacity-50" />
+              <div className="text-sm font-bold text-indigo-300">Recovery OS</div>
+            </div>
+
+            <div className="p-8 bg-white/2 border border-white/5 rounded-3xl space-y-5 flex flex-col hover:border-indigo-500/20 transition-all text-left">
+              <h4 className="text-lg font-medium text-white tracking-tight leading-snug">What if your planner quietly learned when you actually focus best?</h4>
+              <ArrowDown className="w-5 h-5 text-indigo-400 opacity-50" />
+              <div className="text-sm font-bold text-indigo-300">Behavioral Intelligence</div>
+            </div>
+
+            <div className="p-8 bg-white/2 border border-white/5 rounded-3xl space-y-5 flex flex-col hover:border-indigo-500/20 transition-all text-left">
+              <h4 className="text-lg font-medium text-white tracking-tight leading-snug">What if you could dump a messy paragraph and get a structured plan?</h4>
+              <ArrowDown className="w-5 h-5 text-indigo-400 opacity-50" />
+              <div className="text-sm font-bold text-indigo-300">Brain Dump + Vision OCR</div>
+            </div>
+
+            <div className="p-8 bg-white/2 border border-white/5 rounded-3xl space-y-5 flex flex-col hover:border-indigo-500/20 transition-all text-left">
+              <h4 className="text-lg font-medium text-white tracking-tight leading-snug">What if reminders adapted instead of becoming annoying?</h4>
+              <ArrowDown className="w-5 h-5 text-indigo-400 opacity-50" />
+              <div className="text-sm font-bold text-indigo-300">Smart Telegram Companion</div>
+            </div>
+
+            <div className="p-8 bg-white/2 border border-white/5 rounded-3xl space-y-5 flex flex-col hover:border-indigo-500/20 transition-all text-left">
+              <h4 className="text-lg font-medium text-white tracking-tight leading-snug">What if your app helped you recover instead of making you feel guilty?</h4>
+              <ArrowDown className="w-5 h-5 text-indigo-400 opacity-50" />
+              <div className="text-sm font-bold text-indigo-300">Explainable AI Trade-offs</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 2.7 HOW EVERYTHING WORKS TOGETHER */}
+      <section className="py-24 border-t border-white/5 bg-black relative z-10">
+        <div className="max-w-6xl mx-auto px-6 space-y-12">
+          <div className="text-center max-w-2xl mx-auto space-y-3">
+            <h2 className="text-xs font-mono text-indigo-400 tracking-wider uppercase font-semibold">
+              The Execution Lifecycle
+            </h2>
+            <h3 className="text-3xl md:text-5xl font-bold font-display tracking-tight text-white">
+              How Everything Works Together.
+            </h3>
+            <p className="text-slate-400 text-xs md:text-sm leading-relaxed">
+              Saarthi is not one AI feature. It is multiple intelligent systems working together as an ecosystem.
+            </p>
+          </div>
+
+          <div className="max-w-3xl mx-auto pt-6">
+            <div className="space-y-2">
+              {[
+                { phase: "Capture", tech: "Brain Dump • OCR • Voice • Telegram" },
+                { phase: "Understand", tech: "Gemini • Risk Engine • Completion Confidence • Behavioral Intelligence" },
+                { phase: "Plan", tech: "Adaptive Planning • Task Decomposition • Calendar" },
+                { phase: "Execute", tech: "Activation Engine • Daily Brief • Telegram • Voice" },
+                { phase: "Recover", tech: "Recovery OS • Confidence Rebuild • Trade-offs" },
+                { phase: "Learn", tech: "Behavior Memory • Insights • Learning Profile" },
+                { phase: "Adapt", tech: "Adaptive Planning • Daily Improvements • Explainable AI" },
+              ].map((step, idx) => (
+                <div key={idx} className="flex flex-col items-center">
+                  <div className="w-full p-6 md:p-8 bg-neutral-950/60 border border-white/5 rounded-2xl flex flex-col md:flex-row items-center justify-between hover:border-indigo-500/20 transition-all group gap-4 md:gap-0">
+                    <span className="text-xl md:text-2xl font-bold text-white font-display group-hover:text-indigo-400 transition-colors tracking-tight">{step.phase}</span>
+                    <span className="text-xs font-mono text-slate-500 text-center md:text-right">{step.tech}</span>
+                  </div>
+                  {idx < 6 && <ArrowDown className="w-5 h-5 text-indigo-500/50 my-2" />}
+                </div>
+              ))}
+              <div className="flex flex-col items-center">
+                 <ArrowDown className="w-5 h-5 text-emerald-500/50 my-2" />
+                 <div className="w-full p-6 md:p-8 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-center justify-center text-emerald-400 font-bold text-2xl font-display tracking-tight">
+                    Succeed
+                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 2.8 A REAL USER JOURNEY */}
+      <section className="py-24 border-t border-white/5 bg-[#030303] relative z-10">
+        <div className="max-w-4xl mx-auto px-6 space-y-12">
+          <div className="text-center max-w-2xl mx-auto space-y-3">
+            <h2 className="text-xs font-mono text-indigo-400 tracking-wider uppercase font-semibold">
+              The Ecosystem in Action
+            </h2>
+            <h3 className="text-3xl md:text-5xl font-bold font-display tracking-tight text-white">
+              A Real Execution Journey.
+            </h3>
+          </div>
+
+          <div className="bg-white/2 border border-white/5 rounded-3xl p-8 md:p-12 text-left space-y-10 relative overflow-hidden">
+             <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/5 blur-3xl pointer-events-none" />
+             
+             <div className="flex flex-col md:flex-row gap-6 items-start relative z-10">
+               <div className="bg-indigo-500/10 text-indigo-400 w-12 h-12 flex items-center justify-center rounded-2xl shrink-0 font-bold font-mono">01</div>
+               <div>
+                 <h4 className="text-lg font-bold text-white mb-2">Lav has an assignment due in five days.</h4>
+                 <p className="text-sm text-slate-400 leading-relaxed">He pastes a messy, unstructured paragraph into Saarthi. The <strong className="text-slate-200 font-medium">Brain Dump</strong> instantly extracts the core commitments. The <strong className="text-slate-200 font-medium">Adaptive Planner</strong> decomposes the work into minute-by-minute steps, scheduling them around his historical focus habits.</p>
+               </div>
+             </div>
+             
+             <div className="flex flex-col md:flex-row gap-6 items-start relative z-10">
+               <div className="bg-indigo-500/10 text-indigo-400 w-12 h-12 flex items-center justify-center rounded-2xl shrink-0 font-bold font-mono">02</div>
+               <div>
+                 <h4 className="text-lg font-bold text-white mb-2">He starts losing momentum.</h4>
+                 <p className="text-sm text-slate-400 leading-relaxed">The <strong className="text-slate-200 font-medium">Telegram Companion</strong> keeps him accountable, but he feels overwhelmed and avoids starting. The <strong className="text-slate-200 font-medium">Activation Engine</strong> detects the friction and intervenes, offering a tiny, 5-minute starting point just to break the paralysis.</p>
+               </div>
+             </div>
+
+             <div className="flex flex-col md:flex-row gap-6 items-start relative z-10">
+               <div className="bg-emerald-500/10 text-emerald-400 w-12 h-12 flex items-center justify-center rounded-2xl shrink-0 font-bold font-mono">03</div>
+               <div>
+                 <h4 className="text-lg font-bold text-white mb-2">He misses a critical study session.</h4>
+                 <p className="text-sm text-slate-400 leading-relaxed">Instead of turning tasks red and inducing guilt, the <strong className="text-slate-200 font-medium">Recovery OS</strong> recalculates. It presents a Compromise Strategy, identifying which reading materials to skip to still secure a passing grade. The <strong className="text-slate-200 font-medium">Behavioral Intelligence</strong> engine logs this delay, ensuring next week's schedule automatically provides more buffer time.</p>
+               </div>
+             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 2.9 EVOLUTION OVER TIME */}
+      <section className="py-24 border-t border-white/5 bg-black relative z-10">
+        <div className="max-w-6xl mx-auto px-6 space-y-12">
+          <div className="text-center max-w-2xl mx-auto space-y-3">
+            <h2 className="text-xs font-mono text-indigo-400 tracking-wider uppercase font-semibold">
+              Continuous Adaptation
+            </h2>
+            <h3 className="text-3xl md:text-5xl font-bold font-display tracking-tight text-white">
+              Software That Evolves.
+            </h3>
+            <p className="text-slate-400 text-sm leading-relaxed">
+              Most apps respond. Saarthi evolves. It improves its understanding of you every single day.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 pt-8">
+            <div className="p-5 border border-white/5 rounded-2xl bg-white/2 hover:bg-white/5 transition-colors">
+              <div className="text-xs font-mono text-slate-500 mb-2">Day 1</div>
+              <div className="text-sm font-bold text-white">Knows Nothing</div>
+              <p className="text-xs text-slate-400 mt-2">Saarthi relies on baseline execution algorithms to guide you.</p>
+            </div>
+            <div className="p-5 border border-white/5 rounded-2xl bg-white/2 hover:bg-white/5 transition-colors">
+              <div className="text-xs font-mono text-indigo-500/70 mb-2">Week 1</div>
+              <div className="text-sm font-bold text-white">Starts Learning</div>
+              <p className="text-xs text-slate-400 mt-2">It notices what time of day you actually complete tasks.</p>
+            </div>
+            <div className="p-5 border border-white/5 rounded-2xl bg-white/2 hover:bg-white/5 transition-colors">
+              <div className="text-xs font-mono text-indigo-400/80 mb-2">Month 1</div>
+              <div className="text-sm font-bold text-white">Predicts Habits</div>
+              <p className="text-xs text-slate-400 mt-2">It anticipates Friday fatigue and stops scheduling deep work late.</p>
+            </div>
+            <div className="p-5 border border-white/5 rounded-2xl bg-white/2 hover:bg-white/5 transition-colors">
+              <div className="text-xs font-mono text-indigo-400 mb-2">Month 3</div>
+              <div className="text-sm font-bold text-white">Personalizes</div>
+              <p className="text-xs text-slate-400 mt-2">Recovery strategies perfectly match your psychological profile.</p>
+            </div>
+            <div className="p-5 border border-indigo-500/20 rounded-2xl bg-indigo-500/5 hover:bg-indigo-500/10 transition-colors md:col-span-1 col-span-2 shadow-[0_0_30px_rgba(99,102,241,0.1)]">
+              <div className="text-xs font-mono text-indigo-300 mb-2 font-bold">Month 6</div>
+              <div className="text-sm font-bold text-white">Total Sync</div>
+              <p className="text-xs text-slate-300 mt-2">It deeply understands how you work, preventing burnout before it begins.</p>
             </div>
           </div>
         </div>
@@ -912,45 +1168,14 @@ export default function LandingPage({
                 <Layers className="w-5 h-5" />
               </div>
               <h4 className="text-sm font-bold text-white tracking-tight">
-                AI-Powered Scheduling Assistance
+                Brain Dump
               </h4>
               <p className="text-xs text-slate-400 leading-relaxed">
-                Breaks raw qualitative goals into logical steps.
-                Automatically scales estimates using the Gemini reasoning model
-                to fit your schedule.
+                Capture messy thoughts. Transform them into structured commitments via text, voice, or image.
               </p>
             </div>
 
             {/* Feature 2 */}
-            <div className="bg-neutral-950/40 border border-white/5 rounded-3xl p-6 space-y-4 hover:border-indigo-500/20 hover:bg-neutral-950/80 transition-all group">
-              <div className="p-2.5 bg-purple-500/10 text-purple-400 rounded-2xl w-fit">
-                <TrendingUp className="w-5 h-5" />
-              </div>
-              <h4 className="text-sm font-bold text-white tracking-tight">
-                Execution Activation Engine
-              </h4>
-              <p className="text-xs text-slate-400 leading-relaxed">
-                Continually computes an active score based on deadlines,
-                remaining workload, and cognitive factors to dynamically
-                generate frictionless starting steps.
-              </p>
-            </div>
-
-            {/* Feature 3 */}
-            <div className="bg-neutral-950/40 border border-white/5 rounded-3xl p-6 space-y-4 hover:border-indigo-500/20 hover:bg-neutral-950/80 transition-all group">
-              <div className="p-2.5 bg-rose-500/10 text-rose-400 rounded-2xl w-fit">
-                <ShieldCheck className="w-5 h-5" />
-              </div>
-              <h4 className="text-sm font-bold text-white tracking-tight">
-                Behavioral Intelligence
-              </h4>
-              <p className="text-xs text-slate-400 leading-relaxed">
-                When a conflict is detected, the Recovery OS compiles
-                immediate tactical rescue strategies and actionable compromises based on your learning profile.
-              </p>
-            </div>
-
-            {/* Feature 4 */}
             <div className="bg-neutral-950/40 border border-white/5 rounded-3xl p-6 space-y-4 hover:border-indigo-500/20 hover:bg-neutral-950/80 transition-all group">
               <div className="p-2.5 bg-amber-500/10 text-amber-400 rounded-2xl w-fit">
                 <Camera className="w-5 h-5" />
@@ -959,24 +1184,46 @@ export default function LandingPage({
                 Adaptive AI Planning
               </h4>
               <p className="text-xs text-slate-400 leading-relaxed">
-                Scan multiple syllabus deadlines directly from images using
-                Gemini Vision for structured import and fully autonomous
-                execution scheduling.
+                Turn goals into realistic execution plans. Instead of static schedules, plans evolve daily.
+              </p>
+            </div>
+
+            {/* Feature 3 */}
+            <div className="bg-neutral-950/40 border border-white/5 rounded-3xl p-6 space-y-4 hover:border-indigo-500/20 hover:bg-neutral-950/80 transition-all group">
+              <div className="p-2.5 bg-purple-500/10 text-purple-400 rounded-2xl w-fit">
+                <TrendingUp className="w-5 h-5" />
+              </div>
+              <h4 className="text-sm font-bold text-white tracking-tight">
+                Execution Activation & Emotional Intelligence
+              </h4>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Detects execution paralysis and intervenes emotionally (e.g., "Looks like today got overwhelming. Let's rebuild tomorrow.") to generate tiny, frictionless starting points.
+              </p>
+            </div>
+
+            {/* Feature 4 */}
+            <div className="bg-neutral-950/40 border border-white/5 rounded-3xl p-6 space-y-4 hover:border-indigo-500/20 hover:bg-neutral-950/80 transition-all group">
+              <div className="p-2.5 bg-rose-500/10 text-rose-400 rounded-2xl w-fit">
+                <ShieldCheck className="w-5 h-5" />
+              </div>
+              <h4 className="text-sm font-bold text-white tracking-tight">
+                Recovery OS & Decision Engine
+              </h4>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                When life goes wrong, the AI acts as a decision engine focused on what NOT to do. Generates a Compromise Strategy (e.g., "Deadline impossible? Drop Feature X. Finish Core.") to salvage the deadline.
               </p>
             </div>
 
             {/* Feature 5 */}
             <div className="bg-neutral-950/40 border border-white/5 rounded-3xl p-6 space-y-4 hover:border-indigo-500/20 hover:bg-neutral-950/80 transition-all group">
               <div className="p-2.5 bg-emerald-500/10 text-emerald-400 rounded-2xl w-fit">
-                <Calendar className="w-5 h-5" />
+                <TrendingUp className="w-5 h-5" />
               </div>
               <h4 className="text-sm font-bold text-white tracking-tight">
-                Calendar Integration & Goal Tracking
+                AI Behavioral Memory
               </h4>
               <p className="text-xs text-slate-400 leading-relaxed">
-                Real OAuth linkage connects your active commitments to Google Calendar
-                and Google Tasks, creating unified goal tracking and
-                accountability.
+                Continuously learns how you actually work to optimize future interventions (e.g., "You usually finish coding after dinner, but your productivity drops on Fridays.").
               </p>
             </div>
 
@@ -1150,7 +1397,7 @@ export default function LandingPage({
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pt-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 pt-6">
             <div className="p-6 bg-white/2 border border-white/5 rounded-3xl space-y-3 hover:border-indigo-500/10 transition-all">
               <span className="text-[9px] font-mono text-indigo-400 uppercase tracking-wider block font-bold">
                 Primary Model
@@ -1161,6 +1408,18 @@ export default function LandingPage({
               <p className="text-xs text-slate-400">
                 Powers real-time decomposition and tactical execution strategy
                 generation with high logical throughput.
+              </p>
+            </div>
+
+            <div className="p-6 bg-white/2 border border-white/5 rounded-3xl space-y-3 hover:border-indigo-500/10 transition-all">
+              <span className="text-[9px] font-mono text-indigo-400 uppercase tracking-wider block font-bold">
+                Complex Reasoning
+              </span>
+              <h4 className="text-base font-bold text-slate-200">
+                Gemini 1.5 Pro
+              </h4>
+              <p className="text-xs text-slate-400">
+                Analyzes massive behavioral datasets to build long-term execution profiles and deep insights.
               </p>
             </div>
 
@@ -1226,6 +1485,18 @@ export default function LandingPage({
               <p className="text-xs text-slate-400">
                 Direct write-back integrations provide standard synchronization
                 with default calendar screens.
+              </p>
+            </div>
+
+            <div className="p-6 bg-white/2 border border-white/5 rounded-3xl space-y-3 hover:border-indigo-500/10 transition-all">
+              <span className="text-[9px] font-mono text-indigo-400 uppercase tracking-wider block font-bold">
+                Platform
+              </span>
+              <h4 className="text-base font-bold text-slate-200">
+                Google AI Studio
+              </h4>
+              <p className="text-xs text-slate-400">
+                Empowers rapid prompt engineering and model tuning for the behavioral intelligence engine.
               </p>
             </div>
           </div>
@@ -1374,20 +1645,41 @@ export default function LandingPage({
         </div>
       </section>
 
+      {/* 7.5 WHY THIS MATTERS */}
+      <section className="py-32 border-t border-white/5 bg-[#030303] relative z-10 text-center">
+        <div className="max-w-3xl mx-auto px-6 space-y-8">
+          <h2 className="text-3xl md:text-5xl font-bold font-display tracking-tight text-white mb-8">
+            The Future of Execution.
+          </h2>
+          <div className="text-slate-400 text-lg md:text-xl leading-relaxed space-y-6 font-medium">
+            <p>The future of productivity isn't remembering more.</p>
+            <p>It's needing to think less.</p>
+          </div>
+          
+          <div className="pt-12">
+            <div className="inline-block p-6 md:p-8 rounded-3xl bg-white/5 border border-white/10 backdrop-blur-xl">
+              <p className="text-white font-display text-xl md:text-2xl tracking-tight leading-relaxed">
+                Your calendar knows your schedule.<br/>
+                <span className="text-indigo-400">Saarthi learns how you succeed.</span>
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* 8. FINAL CTA */}
       <section className="py-32 border-t border-white/5 bg-gradient-to-b from-black to-neutral-950 relative overflow-hidden z-10 text-center px-6">
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[300px] bg-indigo-600/10 blur-[120px] rounded-full pointer-events-none" />
 
         <div className="max-w-3xl mx-auto space-y-8 relative">
           <h2 className="text-4xl md:text-6xl font-bold font-display tracking-tight text-white leading-tight">
-            Your Deadlines Already Have a Date. <br />
+            Stop Planning. <br />
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-emerald-400">
-              Your Success Should Too.
+              Start Executing.
             </span>
           </h2>
           <p className="text-slate-400 text-sm md:text-base max-w-xl mx-auto">
-            Break free from the stressful alarm schedules. Start planning with
-            proactive AI support and lock down your goals today.
+            Experience the first AI system designed to understand why you fail—and built to ensure you finish.
           </p>
 
           <div className="pt-4">
