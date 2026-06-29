@@ -2,7 +2,7 @@
 
 # 🧭 Saarthi
 
-**The Autonomous, AI-Powered Rescue Engine for High-Stakes Deadlines**
+**The Behavioral Execution Platform for Ambitious Knowledge Workers**
 
 [![Build Status](https://img.shields.io/badge/Build-Passing-emerald.svg)](#)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue.svg)](https://www.typescriptlang.org/)
@@ -229,7 +229,7 @@ Saarthi is fully responsive, utilizing Tailwind's mobile-first utility classes t
 
 ## 🏆 Why Saarthi is Different
 
-Saarthi is not a "todo app wrapper" around an LLM. It is an **active system** that behaves like a Chief of Staff. 
+Saarthi is not a "todo app wrapper" around an LLM. It is an **active system** that behaves like an intelligent Execution Operating System. 
 
 While traditional applications wait for user input, Saarthi calculates degradation, anticipates failure, and pushes actionable recovery strategies via multiple channels (Web, Voice, Telegram, Calendar) before the crisis becomes unmanageable.
 
@@ -248,5 +248,5 @@ This project is licensed under the **MIT License**. See the `LICENSE` file for d
 ---
 
 <div align="center">
-  <p>Engineered with precision for the Google AI Hackathon.</p>
+  <p>Engineered for high-stakes execution.</p>
 </div>

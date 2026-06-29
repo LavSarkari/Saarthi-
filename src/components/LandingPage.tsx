@@ -267,7 +267,7 @@ export default function LandingPage({
               </div>
               {!isScrolled && (
                 <span className="text-[9px] text-slate-500 font-medium tracking-tight mt-0.5">
-                  Syllabus & Deadline Execution
+                  Execution Operating System
                 </span>
               )}
             </div>
@@ -329,22 +329,20 @@ export default function LandingPage({
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
             <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-indigo-500"></span>
           </span>
-          Google AI Studio Hackathon Flagship
+          Saarthi Execution OS
         </div>
 
         {/* Headline */}
         <h1 className="text-4xl md:text-7xl font-bold font-display tracking-tight text-white max-w-4xl mx-auto leading-[1.1]">
-          The Last-Minute <br />
+          The Intelligence to <br />
           <span className="bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 via-purple-300 to-emerald-400">
-            Life Saver.
+            Finish the Work.
           </span>
         </h1>
 
         {/* Subheadline */}
         <p className="text-slate-400 text-sm md:text-lg max-w-2xl mx-auto leading-relaxed">
-          Saarthi is an AI-powered productivity companion that proactively
-          assists you in planning, prioritizing, and completing tasks before
-          deadlines are missed.
+          Saarthi is an adaptive execution engine. It learns your behavior, anticipates failure, and automatically recalculates your path to completion before deadlines are missed.
         </p>
 
         {/* CTAs */}
@@ -501,15 +499,13 @@ export default function LandingPage({
         <div className="max-w-6xl mx-auto px-6 space-y-12">
           <div className="text-center max-w-2xl mx-auto space-y-3">
             <h2 className="text-xs font-mono text-indigo-400 tracking-wider uppercase font-semibold">
-              The Productivity Crisis
+              The Execution Gap
             </h2>
             <h3 className="text-3xl md:text-5xl font-bold font-display tracking-tight text-white">
-              Reminders Don't Solve Procrastination.
+              Reminders don't finish the work.
             </h3>
             <p className="text-slate-400 text-xs md:text-sm leading-relaxed">
-              Modern calendar pings and checklists assume humans are robots.
-              When friction spikes or schedules overflow, traditional systems
-              fail completely. Saarthi provides a dynamic protective system.
+              Traditional productivity software assumes humans are perfectly disciplined. It stores tasks and sends notifications. When friction spikes and schedules overflow, traditional systems fail completely. Saarthi learns your behavior and continuously renegotiates your path to success.
             </p>
           </div>
 
@@ -519,14 +515,14 @@ export default function LandingPage({
               <div className="absolute top-0 right-0 w-24 h-24 bg-red-500/5 blur-2xl pointer-events-none" />
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-mono uppercase tracking-wider text-red-400 bg-red-500/10 px-2.5 py-0.5 rounded-md font-bold">
-                  Traditional Apps
+                  Traditional Software
                 </span>
                 <span className="text-[11px] font-mono text-slate-500">
-                  Unreactive Alerts
+                  Static & Unreactive
                 </span>
               </div>
               <h4 className="text-xl font-bold text-slate-200">
-                The Screen Fatigue Spiral
+                The Failure of Checklists
               </h4>
 
               {/* Traditional Flow Visualization */}
@@ -537,11 +533,10 @@ export default function LandingPage({
                   </div>
                   <div>
                     <h5 className="text-xs font-bold text-slate-300">
-                      Unstructured Reminder
+                      Passive Storage
                     </h5>
                     <p className="text-[10px] text-slate-500">
-                      A generic notification states: "Database Project Due
-                      tomorrow."
+                      Tasks are stored. Deadlines are recorded. No strategic breakdown is provided.
                     </p>
                   </div>
                 </div>
@@ -552,11 +547,10 @@ export default function LandingPage({
                   </div>
                   <div>
                     <h5 className="text-xs font-bold text-slate-300">
-                      Ignored Due to Friction
+                      Ignored Notifications
                     </h5>
                     <p className="text-[10px] text-slate-500">
-                      You ignore it because starting is overwhelming and
-                      undefined.
+                      A ping fires when it's too late. The friction of starting leads to avoidance.
                     </p>
                   </div>
                 </div>
@@ -567,11 +561,10 @@ export default function LandingPage({
                   </div>
                   <div>
                     <h5 className="text-xs font-bold text-red-400">
-                      Sudden Panic & Missed Deadline
+                      Deadline Collapse
                     </h5>
                     <p className="text-[10px] text-red-400/80">
-                      Last-minute rush leads to severe fatigue, low quality, or
-                      failure.
+                      Compounding delays result in missed objectives or severe burnout.
                     </p>
                   </div>
                 </div>
@@ -583,15 +576,15 @@ export default function LandingPage({
               <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-500/10 blur-2xl pointer-events-none" />
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-mono uppercase tracking-wider text-indigo-400 bg-indigo-500/15 px-2.5 py-0.5 rounded-md font-bold">
-                  Saarthi Execution Engine
+                  Saarthi Engine
                 </span>
                 <span className="text-[11px] font-mono text-emerald-400 flex items-center gap-1">
                   <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />{" "}
-                  Predictive AI
+                  Continuous Adaptation
                 </span>
               </div>
               <h4 className="text-xl font-bold text-white">
-                Continuous Execution Guidance
+                Behavioral Execution OS
               </h4>
 
               {/* Saarthi Flow Visualization */}
@@ -602,11 +595,10 @@ export default function LandingPage({
                   </div>
                   <div>
                     <h5 className="text-xs font-bold text-indigo-300">
-                      Automated Deconstruction
+                      Behavioral Profiling
                     </h5>
                     <p className="text-[10px] text-slate-400">
-                      AI parses the project into 4 action steps with suggested
-                      effort.
+                      Monitors your focus patterns and fatigue levels over time.
                     </p>
                   </div>
                 </div>
@@ -617,10 +609,10 @@ export default function LandingPage({
                   </div>
                   <div>
                     <h5 className="text-xs font-bold text-emerald-300">
-                      Completion Confidence Tracker
+                      Predictive Risk Engine
                     </h5>
                     <p className="text-[10px] text-slate-400">
-                      Computes real-time execution risk based on your schedule.
+                      Calculates the mathematical probability of completion in real-time.
                     </p>
                   </div>
                 </div>
@@ -631,11 +623,10 @@ export default function LandingPage({
                   </div>
                   <div>
                     <h5 className="text-xs font-bold text-purple-300">
-                      Compromise & Rescue Strategy
+                      Autonomous Recovery
                     </h5>
                     <p className="text-[10px] text-slate-400">
-                      Flags overload conflicts and suggests custom operational
-                      recoveries.
+                      Detects delays and negotiates strategic compromises to rescue the deadline.
                     </p>
                   </div>
                 </div>
@@ -1165,7 +1156,7 @@ export default function LandingPage({
                 Primary Model
               </span>
               <h4 className="text-base font-bold text-slate-200">
-                Gemini 3.5 Flash
+                Gemini 2.5 Flash
               </h4>
               <p className="text-xs text-slate-400">
                 Powers real-time decomposition and tactical task strategy
@@ -1424,9 +1415,7 @@ export default function LandingPage({
               </span>
             </div>
             <p className="text-[11px] text-slate-500 max-w-xs leading-relaxed">
-              Saarthi is an advanced AI Execution Partner created for
-              high-stress academic and professional workflows. Built on the
-              Google Cloud platform.
+              Saarthi is a behavioral execution platform designed for high-stress academic and professional workflows. Built on Google Cloud.
             </p>
             <div className="text-[10px] text-slate-600">
               © 2026 Saarthi Platform. All rights reserved.
@@ -1477,7 +1466,7 @@ export default function LandingPage({
                   rel="noreferrer"
                   className="hover:text-white transition-colors"
                 >
-                  Gemini 3.5
+                  Gemini 2.5
                 </a>
               </li>
               <li>
@@ -1505,11 +1494,10 @@ export default function LandingPage({
 
           <div className="space-y-3">
             <h5 className="font-mono text-[10px] text-slate-300 uppercase tracking-wider font-bold">
-              Developer
+              Company
             </h5>
             <div className="text-[11px] text-slate-500 leading-relaxed">
-              Designed as a flagship Google AI submission for extreme
-              productivity enablement.
+              Saarthi is building the adaptive execution layer for ambitious knowledge workers.
             </div>
           </div>
         </div>

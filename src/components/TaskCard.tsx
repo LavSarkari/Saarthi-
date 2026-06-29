@@ -59,6 +59,7 @@ export default function TaskCard({
   onToggleExpandReminder,
   accessToken
 }: TaskCardProps) {
+  const [isCardExpanded, setIsCardExpanded] = useState(false);
   const [showSnoozeDropdown, setShowSnoozeDropdown] = useState(false);
   const [copiedTemplate, setCopiedTemplate] = useState(false);
   
@@ -141,7 +142,15 @@ export default function TaskCard({
 
   return (
     <div
-      className={`bg-white dark:bg-zinc-900 border ${currentZone.border} rounded-2xl p-5 shadow-xs hover:shadow-sm transition-all flex flex-col gap-4.5 relative overflow-hidden break-inside-avoid mb-4 w-full`}
+      className={`bg-white dark:bg-zinc-900 border ${currentZone.border} rounded-[20px] sm:rounded-2xl p-4 sm:p-5 shadow-xs hover:shadow-sm transition-all flex flex-col gap-3 sm:gap-4.5 relative overflow-hidden break-inside-avoid mb-4 w-full cursor-pointer sm:cursor-default`}
+      onClick={(e) => {
+        if ((e.target as HTMLElement).closest('button, input, textarea, a')) {
+          return;
+        }
+        if (window.innerWidth < 640) {
+          setIsCardExpanded(!isCardExpanded);
+        }
+      }}
     >
       {/* Decorative premium accent indicator */}
       <div className={`absolute top-0 left-0 w-1.5 h-full ${currentZone.accentLine}`} />
@@ -149,13 +158,13 @@ export default function TaskCard({
       {/* Top Header Row */}
       <div className="flex items-start justify-between gap-4 pl-1.5">
         <div className="space-y-1 flex-1">
-          <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
-            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-medium border ${currentZone.badgeBg}`}>
+          <div className="flex flex-wrap items-center gap-1.5 mb-1 sm:mb-1.5">
+            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md sm:rounded-lg text-[10px] sm:text-[11px] font-bold sm:font-medium border ${currentZone.badgeBg}`}>
               <ZoneIcon className="w-3 h-3" />
               {currentZone.badgeText}
             </span>
 
-            <span className="inline-flex items-center px-2 py-0.5 bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700/60 text-zinc-500 dark:text-zinc-400 text-[10px] font-medium rounded-md">
+            <span className="hidden sm:inline-flex items-center px-2 py-0.5 bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700/60 text-zinc-500 dark:text-zinc-400 text-[10px] font-medium rounded-md">
               {task.complexity === "high" ? "High focus needed" : task.complexity === "medium" ? "Moderate focus" : "Light focus"}
             </span>
 
@@ -245,12 +254,12 @@ export default function TaskCard({
             </div>
           ) : (
             <>
-              <h3 className="text-base font-semibold font-sans tracking-tight text-zinc-900 dark:text-zinc-50 leading-snug">
+              <h3 className={`text-base font-semibold font-sans tracking-tight text-zinc-900 dark:text-zinc-50 leading-snug ${task.isCompleted ? 'line-through opacity-50' : ''}`}>
                 {task.title}
               </h3>
               
               {task.labels && task.labels.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 mt-1.5 mb-2">
+                <div className="flex flex-wrap gap-1.5 mt-1 sm:mt-1.5 mb-1.5 sm:mb-2">
                   {task.labels.map((lbl, idx) => (
                     <span key={idx} className="inline-flex items-center px-2 py-0.5 bg-indigo-50/80 dark:bg-indigo-950/20 border border-indigo-100/50 dark:border-indigo-900/30 text-indigo-600 dark:text-indigo-400 text-[9px] uppercase tracking-wider font-semibold rounded-md">
                       {lbl}
@@ -259,7 +268,7 @@ export default function TaskCard({
                 </div>
               )}
               
-              <p className="text-zinc-500 dark:text-zinc-400 text-[12px] leading-relaxed max-w-2xl line-clamp-2">
+              <p className={`text-zinc-500 dark:text-zinc-400 text-[11px] sm:text-[12px] leading-relaxed max-w-2xl line-clamp-2 ${!isCardExpanded ? 'hidden sm:block' : ''} ${task.isCompleted ? 'opacity-50' : ''}`}>
                 {task.description || "No description provided."}
               </p>
             </>
@@ -267,23 +276,41 @@ export default function TaskCard({
         </div>
 
         {/* Action buttons */}
-        <div className="flex items-center gap-1.5 shrink-0">
+        <div className={`flex items-center gap-1.5 shrink-0 ${!isCardExpanded ? 'hidden sm:flex' : ''}`}>
           {!isEditing && (
-            <button
-              onClick={() => {
-                setEditTitle(task.title);
-                setEditDescription(task.description);
-                setEditSubtasks(task.subtasks);
-                setIsEditing(true);
-              }}
-              className="p-1.5 text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors"
-              title="Edit commitment"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
-            </button>
+            <>
+              {!task.isCompleted && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onUpdateTask(task.id, { isCompleted: true });
+                  }}
+                  className="p-1.5 text-zinc-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/20 rounded-lg transition-colors"
+                  title="Mark task as complete"
+                >
+                  <Check className="w-3.5 h-3.5 stroke-[3]" />
+                </button>
+              )}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setEditTitle(task.title);
+                  setEditDescription(task.description);
+                  setEditSubtasks(task.subtasks);
+                  setIsEditing(true);
+                }}
+                className="p-1.5 text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors"
+                title="Edit commitment"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
+              </button>
+            </>
           )}
           <button
-            onClick={() => onDeleteTask(task.id)}
+            onClick={(e) => {
+              e.stopPropagation();
+              onDeleteTask(task.id);
+            }}
             className="p-1.5 text-zinc-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/20 rounded-lg transition-colors"
             title="Delete commitment"
           >
@@ -292,6 +319,18 @@ export default function TaskCard({
         </div>
       </div>
 
+      {/* Compact Stats Row for Mobile Unexpanded */}
+      {!isCardExpanded && (
+        <div className="flex sm:hidden items-center justify-between gap-2 pt-2 border-t border-zinc-100 dark:border-zinc-800/40 pl-1.5 text-[10px] font-medium text-zinc-500">
+          <div className="flex items-center gap-3">
+            <span className="flex items-center gap-1"><Check className="w-3 h-3" /> {Math.round(100 - task.riskScore)}% Conf</span>
+            <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {formatTimeRemaining(hoursRemaining)}</span>
+          </div>
+          <span>{completedSubtasks}/{totalSubtasks} Prog</span>
+        </div>
+      )}
+
+      <div className={`flex flex-col gap-3.5 ${!isCardExpanded ? 'hidden sm:flex' : ''}`}>
       {/* Progress & Time Stats Grid */}
       <div className="flex flex-col gap-3.5 pt-3 border-t border-zinc-100 dark:border-zinc-800/40 pl-1.5">
         <div className="flex flex-wrap items-center justify-between gap-4">
@@ -435,12 +474,14 @@ export default function TaskCard({
                 className="overflow-hidden border-t border-zinc-100 dark:border-zinc-800"
               >
                 <div className="p-3 space-y-2">
-                  {task.subtasks
+                  {[...task.subtasks]
                     .sort((a, b) => {
                       if (a.scheduledStart && b.scheduledStart) {
                         return new Date(a.scheduledStart).getTime() - new Date(b.scheduledStart).getTime();
                       }
-                      return (a.order || 0) - (b.order || 0);
+                      const orderDiff = (a.order || 0) - (b.order || 0);
+                      if (orderDiff !== 0) return orderDiff;
+                      return (a.id || "").localeCompare(b.id || "");
                     })
                     .map((sub) => (
                       <div
@@ -689,6 +730,7 @@ export default function TaskCard({
             )}
           </AnimatePresence>
         </div>
+      </div>
       </div>
     </div>
   );

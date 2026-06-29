@@ -63,6 +63,7 @@ export interface Task {
   lastUpdated?: number;
   // Used by Activation Engine to mark tasks as "stuck"
   isStuck?: boolean;
+  isCompleted?: boolean;
 }
 
 export type RecoveryMode = "minimal" | "balanced" | "maximum" | "wellness";

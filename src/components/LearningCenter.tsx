@@ -111,20 +111,29 @@ export default function LearningCenter({ userId }: Props) {
         </p>
       </div>
 
-      <div className="flex flex-col gap-16">
+      <div className="flex flex-col gap-4">
         {sections.map((section) => (
-          <div key={section.id} className="space-y-6">
-            <div className="flex items-center gap-2 border-b border-zinc-200 dark:border-zinc-800 pb-2">
-              {section.icon}
-              <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-100">{section.title}</h2>
-            </div>
+          <details key={section.id} className="group bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-sm overflow-hidden [&_summary::-webkit-details-marker]:hidden" open={section.id === "behavior"}>
+            <summary className="p-4 sm:p-5 flex items-center justify-between cursor-pointer outline-none select-none hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-zinc-100 dark:bg-zinc-800 rounded-lg">
+                  {section.icon}
+                </div>
+                <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">{section.title}</h2>
+              </div>
+              <div className="w-8 h-8 rounded-full flex items-center justify-center group-open:rotate-180 transition-transform bg-zinc-50 dark:bg-zinc-800 text-zinc-400">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+              </div>
+            </summary>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {section.items.map((item, idx) => (
-                <AttributeCard key={idx} label={item.label} attribute={item.attr} formatValue={item.format} />
-              ))}
+            <div className="px-4 pb-4 sm:px-5 sm:pb-5 pt-2 border-t border-zinc-100 dark:border-zinc-800/50 bg-zinc-50/50 dark:bg-zinc-900/50">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+                {section.items.map((item, idx) => (
+                  <AttributeCard key={idx} label={item.label} attribute={item.attr} formatValue={item.format} />
+                ))}
+              </div>
             </div>
-          </div>
+          </details>
         ))}
       </div>
     </div>

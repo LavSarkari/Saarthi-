@@ -38,6 +38,8 @@ import {
   BrainCircuit,
   CalendarDays,
   MessageSquare,
+  BarChart,
+  Menu,
 } from "lucide-react";
 import { User } from "firebase/auth";
 import {
@@ -139,7 +141,7 @@ export default function App() {
   const [needsAuth, setNeedsAuth] = useState(true);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [currentView, setCurrentView] = useState<
-    "landing" | "workspace" | "capture" | "planner" | "tasks" | "insights" | "learning" | "activation"
+    "landing" | "workspace" | "planner" | "tasks" | "engagement"
   >("landing");
   const [isCopilotOpen, setIsCopilotOpen] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -154,6 +156,7 @@ export default function App() {
   >("created");
   const [isTasksSortDropdownOpen, setIsTasksSortDropdownOpen] =
     useState<boolean>(false);
+  const [showCompletedTasks, setShowCompletedTasks] = useState(false);
   const [tasksSearchQuery, setTasksSearchQuery] = useState("");
   const [newCommitment, setNewCommitment] = useState("");
   const [customDeadline, setCustomDeadline] = useState("");
@@ -175,6 +178,10 @@ export default function App() {
   const [analyzerPreview, setAnalyzerPreview] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analyzedResult, setAnalyzedResult] = useState<string | null>(null);
+
+  // Modal States for Background Engines
+  const [isActivationModalOpen, setIsActivationModalOpen] = useState(false);
+  const [isAdaptiveModalOpen, setIsAdaptiveModalOpen] = useState(false);
 
   // OCR Workflow States
   const [extractedCommitments, setExtractedCommitments] = useState<
@@ -320,6 +327,7 @@ export default function App() {
   const [settingsKeyInput, setSettingsKeyInput] = useState<string>("");
   const [showSettingsModal, setShowSettingsModal] = useState<boolean>(false);
   const [showUserDropdown, setShowUserDropdown] = useState<boolean>(false);
+  const [showMobileMoreMenu, setShowMobileMoreMenu] = useState<boolean>(false);
 
   // Telegram states
   const [telegramChatId, setTelegramChatId] = useState<string | null>(null);
@@ -1541,11 +1549,18 @@ export default function App() {
   };
 
   const handleUpdateTask = async (taskId: string, updates: Partial<Task>) => {
-    const finalUpdates = { ...updates, lastUpdated: Date.now() };
+    let finalUpdates = { ...updates, lastUpdated: Date.now() };
+
     setTasks((prevTasks) => {
-      const updatedTasks = prevTasks.map((t) =>
-        t.id === taskId ? { ...t, ...finalUpdates } : t,
-      );
+      const updatedTasks = prevTasks.map((t) => {
+        if (t.id === taskId) {
+          if (finalUpdates.isCompleted) {
+            finalUpdates.subtasks = t.subtasks.map((s) => ({ ...s, done: true }));
+          }
+          return { ...t, ...finalUpdates };
+        }
+        return t;
+      });
       if (user) saveLocalTasks(user.uid, updatedTasks);
       return updatedTasks;
     });
@@ -2937,33 +2952,35 @@ export default function App() {
 
           {/* Center Nav Tabs */}
           <div className="absolute left-1/2 -translate-x-1/2">
-            <nav className="flex items-center gap-1.5 bg-zinc-50/50 dark:bg-zinc-950/40 p-1 rounded-2xl border border-zinc-200/40 dark:border-zinc-800/40">
+            <nav className="flex items-center gap-2 p-1.5">
               {[
-                { id: "workspace", label: "Mission Control" },
-                { id: "capture", label: "Capture" },
-                { id: "planner", label: "Plan" },
-                { id: "tasks", label: "Execute" },
-                { id: "engagement", label: "Insights" },
-                { id: "learning", label: "AI Brain" },
-              ].map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setCurrentView(tab.id as any)}
-                  className={`relative outline-none px-4 py-1.5 text-xs font-semibold rounded-xl transition-all cursor-pointer z-10 ${
-                    currentView === tab.id
-                      ? "text-zinc-900 dark:text-zinc-100"
-                      : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-100/50 dark:hover:bg-zinc-800/50"
-                  }`}
-                >
-                  {currentView === tab.id && (
-                    <motion.div
-                      layoutId="desktopNavIndicator"
-                      className="absolute inset-0 bg-white dark:bg-zinc-800 shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-zinc-200/60 dark:border-zinc-700/80 rounded-xl -z-10"
-                    />
-                  )}
-                  {tab.label}
-                </button>
-              ))}
+                { id: "workspace", label: "Home", icon: Activity },
+                { id: "planner", label: "New", icon: Plus },
+                { id: "tasks", label: "Tasks", icon: CheckSquare },
+                { id: "engagement", label: "Insights", icon: BarChart },
+              ].map((tab) => {
+                const Icon = tab.icon;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setCurrentView(tab.id as any)}
+                    className={`relative outline-none px-4 py-2 flex items-center gap-2 text-[13px] font-bold rounded-full transition-all cursor-pointer z-10 ${
+                      currentView === tab.id
+                        ? "text-zinc-900 dark:text-zinc-100"
+                        : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-100/50 dark:hover:bg-zinc-800/50"
+                    }`}
+                  >
+                    {currentView === tab.id && (
+                      <motion.div
+                        layoutId="desktopNavIndicator"
+                        className="absolute inset-0 bg-white dark:bg-zinc-800 shadow-sm border border-zinc-200/80 dark:border-zinc-700/80 rounded-full -z-10"
+                      />
+                    )}
+                    <Icon className="w-4 h-4" />
+                    {tab.label}
+                  </button>
+                );
+              })}
             </nav>
           </div>
 
@@ -2997,14 +3014,8 @@ export default function App() {
                   ></div>
                   <div className="absolute right-0 mt-3 w-52 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl rounded-2xl shadow-xl border border-zinc-200/80 dark:border-zinc-800/80 overflow-hidden z-50 flex flex-col p-1.5 animate-in slide-in-from-top-2">
                     <button
-                      className="flex items-center gap-3 px-3 py-2.5 text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-colors w-full text-left"
-                    >
-                      <UserIcon className="w-4 h-4 text-zinc-500" />
-                      <span>Profile</span>
-                    </button>
-                    
-                    <button
                       onClick={() => {
+                        setActiveSettingsTab("api");
                         setShowSettingsModal(true);
                         setShowUserDropdown(false);
                       }}
@@ -3012,6 +3023,18 @@ export default function App() {
                     >
                       <Settings className="w-4 h-4 text-zinc-500" />
                       <span>Settings</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setActiveSettingsTab("memory");
+                        setShowSettingsModal(true);
+                        setShowUserDropdown(false);
+                      }}
+                      className="flex items-center gap-3 px-3 py-2.5 text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-colors w-full text-left"
+                    >
+                      <Brain className="w-4 h-4 text-zinc-500" />
+                      <span>AI Memory</span>
                     </button>
 
                     <button
@@ -3034,20 +3057,6 @@ export default function App() {
                           <span>Theme: Dark</span>
                         </>
                       )}
-                    </button>
-
-                    <button
-                      className="flex items-center gap-3 px-3 py-2.5 text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-colors w-full text-left"
-                    >
-                      <HelpCircle className="w-4 h-4 text-zinc-500" />
-                      <span>Help</span>
-                    </button>
-
-                    <button
-                      className="flex items-center gap-3 px-3 py-2.5 text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-colors w-full text-left"
-                    >
-                      <MessageSquare className="w-4 h-4 text-zinc-500" />
-                      <span>Feedback</span>
                     </button>
 
                     <div className="h-px bg-zinc-200/80 dark:bg-zinc-800/80 my-1 mx-2" />
@@ -3090,14 +3099,14 @@ export default function App() {
         <div className="flex items-center gap-2">
           {user?.photoURL ? (
             <img
-              onClick={() => setShowSettingsModal(true)}
+              onClick={() => setShowMobileMoreMenu(true)}
               src={user.photoURL}
               alt="pfp"
               className="w-8 h-8 rounded-full ring-2 ring-zinc-200 dark:ring-zinc-800 shadow-sm"
             />
           ) : (
             <div
-              onClick={() => setShowSettingsModal(true)}
+              onClick={() => setShowMobileMoreMenu(true)}
               className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-600 dark:text-zinc-300 ring-2 ring-zinc-200 dark:ring-zinc-800 shadow-sm"
             >
               <UserIcon className="w-4 h-4" />
@@ -3108,7 +3117,7 @@ export default function App() {
 
       {/* Main Single Screen Layout */}
       {/* Increased top padding on md to account for floating header */}
-      <main className="max-w-[1400px] mx-auto w-full px-6 py-6 md:pt-28 md:pb-12 flex flex-col gap-8 flex-1 pb-[180px] overflow-x-hidden relative">
+      <main className="max-w-[1400px] mx-auto w-full px-4 sm:px-6 py-4 sm:py-6 md:pt-28 md:pb-12 flex flex-col gap-4 sm:gap-8 flex-1 pb-[140px] md:pb-[180px] overflow-x-hidden relative">
         <AnimatePresence mode="wait">
           {currentView === "planner" && (
             <motion.div
@@ -3121,8 +3130,8 @@ export default function App() {
             >
               <div className="flex flex-col gap-8 max-w-4xl mx-auto w-full">
                 {/* Section 1: Dual-Input Cognitive Capture Deck */}
-                <div className="bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800/80 rounded-2xl p-6 shadow-sm overflow-hidden relative transition-all">
-                  <div className="mb-5">
+                <div className="bg-white dark:bg-zinc-900 border-none sm:border sm:border-zinc-200/80 sm:dark:border-zinc-800/80 rounded-none sm:rounded-2xl p-4 sm:p-6 shadow-none sm:shadow-sm overflow-hidden relative transition-all min-h-[calc(100vh-140px)] sm:min-h-0 flex flex-col">
+                  <div className="mb-5 hidden sm:block">
                     <h2 className="text-base font-semibold font-display text-zinc-950 dark:text-zinc-50 mb-1 flex items-center gap-2">
                       <Brain className="w-5 h-5 text-zinc-700 dark:text-zinc-300" />
                       Commitment Planner
@@ -3133,24 +3142,35 @@ export default function App() {
                     </p>
                   </div>
 
-                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+                  <div className="flex-1 flex flex-col lg:grid lg:grid-cols-12 gap-6 items-stretch">
                     {/* Left Column: Natural text entry */}
-                    <div className="lg:col-span-7 flex flex-col justify-between gap-4">
+                    <div className="lg:col-span-7 flex flex-col justify-between gap-4 flex-1">
                       <div className="space-y-2 flex-1 flex flex-col">
-                        <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-500 dark:text-zinc-400 font-semibold block">
+                        <span className="hidden sm:block text-[10px] font-mono uppercase tracking-wider text-zinc-500 dark:text-zinc-400 font-semibold">
                           1. Natural Intention Entry
                         </span>
-                        <div className="relative flex-1 min-h-[90px]">
+                        <div className="relative flex-1 min-h-[150px] sm:min-h-[90px]">
                           <textarea
                             value={newCommitment}
                             onChange={(e) => setNewCommitment(e.target.value)}
-                            placeholder="e.g., 'Draft 2500 word thesis abstract due Friday' or 'Prepare presentation slides for PM launch sync scheduled on Thursday noon'..."
-                            className="w-full h-full bg-zinc-50/50 dark:bg-zinc-950/25 border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 focus:border-zinc-900 dark:focus:border-zinc-300 focus:bg-white dark:focus:bg-zinc-900 rounded-xl p-4 text-xs text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 outline-none resize-none min-h-[90px] transition-all"
+                            placeholder="What do you need to accomplish? Type, paste, or upload a syllabus..."
+                            className="w-full h-full bg-zinc-50/50 sm:bg-zinc-50/50 dark:bg-zinc-950/25 border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 focus:border-zinc-900 dark:focus:border-zinc-300 focus:bg-white dark:focus:bg-zinc-900 rounded-xl sm:rounded-xl p-4 pb-14 sm:pb-4 text-sm sm:text-xs text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 outline-none resize-none min-h-[150px] sm:min-h-[90px] transition-all"
                           />
+                          <div className="absolute bottom-3 right-3 flex items-center gap-2 sm:hidden">
+                            <button className="p-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-full text-zinc-500 shadow-sm hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
+                            </button>
+                            <button className="p-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-full text-zinc-500 shadow-sm hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
+                            </button>
+                            <button className="p-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-full text-zinc-500 shadow-sm hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors" onClick={() => navigator.clipboard.readText().then(t => setNewCommitment(prev => prev + t))}>
+                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg>
+                            </button>
+                          </div>
                         </div>
                       </div>
 
-                      <div className="flex flex-col sm:flex-row gap-3 items-end">
+                      <div className="flex flex-col sm:flex-row gap-3 items-end pb-4 sm:pb-0">
                         <div className="flex-1 w-full">
                           <label className="block text-[10px] font-mono tracking-wider uppercase text-zinc-500 dark:text-zinc-400 mb-1.5 font-medium">
                             Target Project Deadline
@@ -3159,22 +3179,22 @@ export default function App() {
                             type="datetime-local"
                             value={customDeadline}
                             onChange={(e) => setCustomDeadline(e.target.value)}
-                            className="w-full bg-zinc-50 dark:bg-zinc-950/25 border border-zinc-200 dark:border-zinc-800 focus:border-zinc-900 dark:focus:border-zinc-300 focus:bg-white dark:focus:bg-zinc-900 rounded-xl p-2.5 text-xs text-zinc-900 dark:text-zinc-100 outline-none transition-all"
+                            className="w-full bg-zinc-50 dark:bg-zinc-950/25 border border-zinc-200 dark:border-zinc-800 focus:border-zinc-900 dark:focus:border-zinc-300 focus:bg-white dark:focus:bg-zinc-900 rounded-xl p-3 sm:p-2.5 text-sm sm:text-xs text-zinc-900 dark:text-zinc-100 outline-none transition-all"
                           />
                         </div>
                         <button
                           onClick={() => handleAddCommitment()}
                           disabled={isPlanning || !newCommitment.trim()}
-                          className="w-full sm:w-auto flex items-center justify-center gap-2 bg-zinc-950 dark:bg-zinc-100 hover:bg-zinc-800 dark:hover:bg-zinc-200 disabled:bg-zinc-100 dark:disabled:bg-zinc-800 disabled:text-zinc-400 dark:disabled:text-zinc-600 py-3 px-6 rounded-xl text-xs font-semibold text-white dark:text-zinc-950 transition-all cursor-pointer shadow-sm shrink-0"
+                          className="w-full sm:w-auto flex items-center justify-center gap-2 bg-zinc-950 dark:bg-zinc-100 hover:bg-zinc-800 dark:hover:bg-zinc-200 disabled:bg-zinc-100 dark:disabled:bg-zinc-800 disabled:text-zinc-400 dark:disabled:text-zinc-600 py-4 sm:py-3 px-6 rounded-2xl sm:rounded-xl text-sm sm:text-xs font-bold sm:font-semibold text-white dark:text-zinc-950 transition-all cursor-pointer shadow-sm shrink-0"
                         >
                           {isPlanning ? (
                             <>
-                              <RefreshCw className="w-4 h-4 animate-spin" />
+                              <RefreshCw className="w-5 h-5 sm:w-4 sm:h-4 animate-spin" />
                               Analyzing...
                             </>
                           ) : (
                             <>
-                              <Sparkles className="w-4 h-4 text-zinc-300 dark:text-zinc-700" />
+                              <Sparkles className="w-5 h-5 sm:w-4 sm:h-4 text-zinc-300 dark:text-zinc-700" />
                               Decompose Task
                             </>
                           )}
@@ -3198,30 +3218,32 @@ export default function App() {
                   </div>
 
                   {/* Example Prompts helper */}
-                  <div className="mt-4 pt-4 border-t border-zinc-100 dark:border-zinc-800/80 flex flex-wrap gap-2 items-center">
-                    <span className="text-[10px] font-mono text-zinc-400 dark:text-zinc-500 font-medium uppercase">
+                  <div className="mt-4 pt-4 border-t border-zinc-100 dark:border-zinc-800/80 flex flex-col sm:flex-row gap-2 sm:items-center">
+                    <span className="text-[10px] font-mono text-zinc-400 dark:text-zinc-500 font-medium uppercase shrink-0">
                       Quick templates:
                     </span>
-                    <button
-                      onClick={() =>
-                        loadExampleCommitment(
-                          "Physics Lab Assignment on thermal conductivity, due Friday. Need outline, formula spreadsheet, and 12-page write-up completed.",
-                        )
-                      }
-                      className="bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-300 text-[10px] px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
-                    >
-                      Physics Lab Report
-                    </button>
-                    <button
-                      onClick={() =>
-                        loadExampleCommitment(
-                          "Refactor user database schema, setup firebase firestore indexing, and compile the local dev build on server by Thursday noon.",
-                        )
-                      }
-                      className="bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-300 text-[10px] px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
-                    >
-                      Tech Refactoring
-                    </button>
+                    <div className="flex gap-2 overflow-x-auto pb-2 sm:pb-0 no-scrollbar snap-x">
+                      <button
+                        onClick={() =>
+                          loadExampleCommitment(
+                            "Physics Lab Assignment on thermal conductivity, due Friday. Need outline, formula spreadsheet, and 12-page write-up completed.",
+                          )
+                        }
+                        className="bg-zinc-50 dark:bg-zinc-800/50 hover:bg-zinc-100 dark:hover:bg-zinc-800 border border-zinc-200/50 dark:border-zinc-700/50 text-zinc-600 dark:text-zinc-400 text-xs sm:text-[10px] px-3 py-1.5 sm:px-2.5 sm:py-1 rounded-lg transition-colors cursor-pointer shrink-0 snap-start whitespace-nowrap"
+                      >
+                        Physics Lab Report
+                      </button>
+                      <button
+                        onClick={() =>
+                          loadExampleCommitment(
+                            "Refactor user database schema, setup firebase firestore indexing, and compile the local dev build on server by Thursday noon.",
+                          )
+                        }
+                        className="bg-zinc-50 dark:bg-zinc-800/50 hover:bg-zinc-100 dark:hover:bg-zinc-800 border border-zinc-200/50 dark:border-zinc-700/50 text-zinc-600 dark:text-zinc-400 text-xs sm:text-[10px] px-3 py-1.5 sm:px-2.5 sm:py-1 rounded-lg transition-colors cursor-pointer shrink-0 snap-start whitespace-nowrap"
+                      >
+                        Tech Refactoring
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -3289,7 +3311,7 @@ export default function App() {
                         
                         <div className="flex flex-col gap-3">
                           <button
-                            onClick={() => setCurrentView("activation")}
+                            onClick={() => setIsActivationModalOpen(true)}
                             className="w-full bg-rose-600 hover:bg-rose-700 text-white font-bold py-3.5 sm:py-4 rounded-xl transition-all cursor-pointer shadow-md flex items-center justify-center gap-2 group"
                           >
                             Launch Sequence
@@ -3437,7 +3459,7 @@ export default function App() {
                     "Map out a new course, capture commitments, or deconstruct a syllabus.",
                   actionText: "Open Planner",
                   icon: FileText,
-                  onClick: () => setCurrentView("capture"),
+                  onClick: () => setCurrentView("planner"),
                 });
 
                 const activeRecs = recommendationsList.slice(0, 3);
@@ -3552,7 +3574,7 @@ export default function App() {
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-md mx-auto mt-6">
                         <button
-                          onClick={() => setCurrentView("capture")}
+                          onClick={() => setCurrentView("planner")}
                           className="p-4 border border-zinc-200 dark:border-zinc-800 rounded-xl bg-white dark:bg-zinc-900 text-left hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors shadow-xs group cursor-pointer"
                         >
                           <Plus className="w-4 h-4 text-zinc-500 mb-2 group-hover:text-zinc-800 dark:group-hover:text-zinc-200" />
@@ -3586,22 +3608,22 @@ export default function App() {
                 }
 
                 const incompleteSorted = scoredTasks
-                  .filter((t) => t.subtasks.some((s) => !s.done))
-                  .sort(
-                    (a, b) =>
-                      new Date(a.deadline).getTime() -
-                      new Date(b.deadline).getTime(),
-                  );
+                  .filter((t) => !t.isCompleted)
+                  .sort((a, b) => {
+                    const diff = new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
+                    if (diff !== 0) return diff;
+                    return a.id.localeCompare(b.id);
+                  });
                 const nextDeadlines = incompleteSorted.slice(0, 2);
 
                 return (
-                  <div className="flex flex-col gap-8 w-full max-w-5xl mx-auto py-2 animate-fade-in">
+                  <div className="flex flex-col gap-5 sm:gap-8 w-full max-w-5xl mx-auto py-1 sm:py-2 animate-fade-in">
                     {/* 1. Greeting Section */}
-                    <div className="space-y-1">
-                      <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
+                    <div className="space-y-0.5 sm:space-y-1">
+                      <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
                         {greetingWord}, {userName}
                       </h1>
-                      <p className="text-zinc-500 dark:text-zinc-400 text-xs">
+                      <p className="text-zinc-500 dark:text-zinc-400 text-[11px] sm:text-xs">
                         Your quiet executive assistant for keeping pacing steady
                         and milestone buffers secure.
                       </p>
@@ -3625,7 +3647,7 @@ export default function App() {
                         );
 
                         return (
-                          <div className="relative border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/60 rounded-2xl p-6 shadow-xs overflow-hidden flex flex-col gap-4.5">
+                          <div className="relative border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/60 rounded-[20px] sm:rounded-2xl p-4 sm:p-6 shadow-xs overflow-hidden flex flex-col gap-3 sm:gap-4.5">
                             {/* Background accent line indicating risk state */}
                             <div
                               className={`absolute top-0 left-0 h-full w-1.5 ${
@@ -3637,24 +3659,24 @@ export default function App() {
                               }`}
                             />
 
-                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                              <div className="space-y-1.5">
-                                <span className="text-[10px] font-mono font-bold tracking-wider text-zinc-400 dark:text-zinc-500 uppercase">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4">
+                              <div className="space-y-1 sm:space-y-1.5">
+                                <span className="text-[9px] sm:text-[10px] font-mono font-bold tracking-wider text-zinc-400 dark:text-zinc-500 uppercase">
                                   Today's primary commitment
                                 </span>
-                                <h2 className="text-xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50 font-sans">
+                                <h2 className="text-lg sm:text-xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50 font-sans">
                                   {focusTask.title}
                                 </h2>
-                                <p className="text-xs text-zinc-600 dark:text-zinc-400 max-w-2xl leading-relaxed">
+                                <p className="text-[11px] sm:text-xs text-zinc-600 dark:text-zinc-400 max-w-2xl leading-relaxed hidden sm:block">
                                   Because{" "}
                                   {focusTask.analysis.explanation.primaryReason.toLowerCase()}{" "}
                                   which constrains your pacing safety cushion.
                                 </p>
                               </div>
 
-                              <div className="flex items-center gap-1.5 shrink-0 self-start md:self-auto">
+                              <div className="flex items-center gap-1.5 shrink-0 self-start sm:self-auto">
                                 <span
-                                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-medium border ${
+                                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md sm:rounded-lg text-[10px] sm:text-[11px] font-bold sm:font-medium border ${
                                     focusTask.riskZone === "critical"
                                       ? "bg-rose-50 text-rose-700 dark:bg-rose-950/20 dark:text-rose-500 border-rose-100"
                                       : focusTask.riskZone === "watch"
@@ -3671,39 +3693,39 @@ export default function App() {
                               </div>
                             </div>
 
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 py-1.5">
-                              <div className="p-3 border border-zinc-200 dark:border-zinc-800 rounded-xl bg-white dark:bg-zinc-900/60 shadow-xxs">
-                                <span className="text-[10px] font-medium text-zinc-400 dark:text-zinc-500 block">
-                                  Remaining cushion
+                            <div className="grid grid-cols-3 gap-2 sm:gap-4 py-1 sm:py-1.5">
+                              <div className="p-2 sm:p-3 border border-zinc-200 dark:border-zinc-800 rounded-xl sm:rounded-xl bg-white dark:bg-zinc-900/60 shadow-xxs flex flex-col justify-center">
+                                <span className="text-[9px] sm:text-[10px] font-medium text-zinc-400 dark:text-zinc-500 block truncate">
+                                  Buffer
                                 </span>
-                                <span className="text-sm font-semibold text-zinc-800 dark:text-zinc-100 mt-1 block flex items-center gap-1">
-                                  <Clock className="w-3.5 h-3.5 text-zinc-400" />
+                                <span className="text-xs sm:text-sm font-bold sm:font-semibold text-zinc-800 dark:text-zinc-100 mt-0.5 sm:mt-1 block flex items-center gap-1">
+                                  <Clock className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-zinc-400" />
                                   {formatTimeRemaining(hoursRemaining)}
                                 </span>
                               </div>
 
-                              <div className="p-3 border border-zinc-200 dark:border-zinc-800 rounded-xl bg-white dark:bg-zinc-900/60 shadow-xxs">
-                                <span className="text-[10px] font-medium text-zinc-400 dark:text-zinc-500 block">
-                                  Completion confidence
+                              <div className="p-2 sm:p-3 border border-zinc-200 dark:border-zinc-800 rounded-xl sm:rounded-xl bg-white dark:bg-zinc-900/60 shadow-xxs flex flex-col justify-center">
+                                <span className="text-[9px] sm:text-[10px] font-medium text-zinc-400 dark:text-zinc-500 block truncate">
+                                  Confidence
                                 </span>
-                                <span className="text-sm font-semibold text-zinc-800 dark:text-zinc-100 mt-1 block flex items-center gap-1">
-                                  <Check className="w-3.5 h-3.5 text-zinc-400" />
+                                <span className="text-xs sm:text-sm font-bold sm:font-semibold text-zinc-800 dark:text-zinc-100 mt-0.5 sm:mt-1 block flex items-center gap-1">
+                                  <Check className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-zinc-400" />
                                   {focusTask.analysis.completionConfidence}%
                                 </span>
                               </div>
 
-                              <div className="p-3 border border-zinc-200 dark:border-zinc-800 rounded-xl bg-white dark:bg-zinc-900/60 shadow-xxs">
-                                <span className="text-[10px] font-medium text-zinc-400 dark:text-zinc-500 block">
-                                  Estimated focus time
+                              <div className="p-2 sm:p-3 border border-zinc-200 dark:border-zinc-800 rounded-xl sm:rounded-xl bg-white dark:bg-zinc-900/60 shadow-xxs flex flex-col justify-center">
+                                <span className="text-[9px] sm:text-[10px] font-medium text-zinc-400 dark:text-zinc-500 block truncate">
+                                  Time
                                 </span>
-                                <span className="text-sm font-semibold text-zinc-800 dark:text-zinc-100 mt-1 block flex items-center gap-1">
-                                  <Clock className="w-3.5 h-3.5 text-zinc-400" />
-                                  {estimatedFocusTime} minutes
+                                <span className="text-xs sm:text-sm font-bold sm:font-semibold text-zinc-800 dark:text-zinc-100 mt-0.5 sm:mt-1 block flex items-center gap-1">
+                                  <Clock className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-zinc-400" />
+                                  {estimatedFocusTime}m
                                 </span>
                               </div>
                             </div>
 
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 pt-1 sm:pt-2">
                               {nextSubtask ? (
                                 <button
                                   onClick={() =>
@@ -3712,12 +3734,11 @@ export default function App() {
                                       nextSubtask.id,
                                     )
                                   }
-                                  className="px-4 py-2 bg-zinc-900 dark:bg-zinc-100 hover:bg-zinc-800 dark:hover:bg-zinc-200 text-white dark:text-zinc-950 text-xs font-semibold rounded-xl shadow-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer self-start"
+                                  className="w-full sm:w-auto px-4 py-3 sm:py-2 bg-zinc-900 dark:bg-zinc-100 hover:bg-zinc-800 dark:hover:bg-zinc-200 text-white dark:text-zinc-950 text-xs font-bold sm:font-semibold rounded-xl shadow-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                                 >
-                                  <CheckSquare className="w-3.5 h-3.5" />
-                                  <span>
-                                    Resolve next milestone: "{nextSubtask.title}
-                                    "
+                                  <CheckSquare className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
+                                  <span className="truncate">
+                                    Next: {nextSubtask.title}
                                   </span>
                                 </button>
                               ) : (
@@ -3727,7 +3748,7 @@ export default function App() {
                                 </div>
                               )}
 
-                              <div className="flex items-center gap-2 self-end sm:self-auto">
+                              <div className="flex items-center gap-2 self-stretch sm:self-auto">
                                 <button
                                   onClick={() => {
                                     setExpandedTaskId(
@@ -3736,7 +3757,7 @@ export default function App() {
                                         : focusTask.id,
                                     );
                                   }}
-                                  className="px-3 py-1.5 text-xs font-medium border border-zinc-200 dark:border-zinc-800 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors text-zinc-600 dark:text-zinc-300 cursor-pointer"
+                                  className="w-full sm:w-auto px-3 py-2 sm:py-1.5 text-[11px] sm:text-xs font-bold sm:font-medium border border-zinc-200 dark:border-zinc-800 rounded-xl sm:rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors text-zinc-600 dark:text-zinc-300 cursor-pointer"
                                 >
                                   {expandedTaskId === focusTask.id
                                     ? "Close tracker"
@@ -3748,87 +3769,94 @@ export default function App() {
                         );
                       })()}
 
-                    {/* 3. Execution Health Banner & 4. Quick Summary Cards */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      {/* Health banner */}
-                      <div
-                        className={`md:col-span-3 border p-4.5 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xxs ${healthClass}`}
-                      >
-                        <div className="space-y-0.5">
-                          <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-zinc-400">
-                            Overall pacing health
+                    {/* Secondary Analytics (Expandable on Mobile) */}
+                    <details className="group border border-zinc-200 dark:border-zinc-800 rounded-2xl bg-zinc-50/50 dark:bg-zinc-900/30 overflow-hidden">
+                      <summary className="px-4 py-3 sm:hidden text-xs font-bold text-zinc-700 dark:text-zinc-300 flex items-center justify-between cursor-pointer outline-none select-none">
+                        View pacing analytics
+                        <ChevronDown className="w-4 h-4 text-zinc-500 group-open:-rotate-180 transition-transform" />
+                      </summary>
+                      
+                      <div className="hidden sm:grid sm:grid-cols-1 md:grid-cols-3 gap-4 group-open:grid grid-cols-1 p-4 sm:p-0">
+                        {/* Health banner */}
+                        <div
+                          className={`md:col-span-3 border p-4.5 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xxs ${healthClass}`}
+                        >
+                          <div className="space-y-0.5">
+                            <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-zinc-400">
+                              Overall pacing health
+                            </span>
+                            <h3 className="text-sm font-semibold font-sans">
+                              {healthTitle}
+                            </h3>
+                            <p className="text-xs text-zinc-600 dark:text-zinc-300 leading-relaxed">
+                              {healthDesc}
+                            </p>
+                          </div>
+
+                          <div className="flex items-center gap-3 shrink-0">
+                            <div className="text-right">
+                              <span className="text-[10px] text-zinc-400 font-medium block">
+                                Paced buffer average
+                              </span>
+                              <span className="text-lg font-bold font-sans">
+                                {avgConfidence}%
+                              </span>
+                            </div>
+                            <div className="w-1.5 h-10 bg-zinc-200 dark:bg-zinc-800 rounded-full overflow-hidden">
+                              <div
+                                className={`w-full h-full ${
+                                  avgConfidence >= 75
+                                    ? "bg-emerald-500"
+                                    : avgConfidence >= 45
+                                      ? "bg-amber-500"
+                                      : "bg-rose-500"
+                                }`}
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Quick Summary Cards */}
+                        <div className="p-4 border border-zinc-200 dark:border-zinc-800 rounded-xl bg-white dark:bg-zinc-900/60 shadow-xxs text-center">
+                          <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-medium">
+                            Focus commitments
                           </span>
-                          <h3 className="text-sm font-semibold font-sans">
-                            {healthTitle}
-                          </h3>
-                          <p className="text-xs text-zinc-600 dark:text-zinc-300 leading-relaxed">
-                            {healthDesc}
+                          <span className="text-2xl font-bold text-zinc-900 dark:text-zinc-50 mt-1 block font-sans">
+                            {totalActive}
+                          </span>
+                          <p className="text-[10px] text-zinc-500 mt-1">
+                            Currently being managed
                           </p>
                         </div>
 
-                        <div className="flex items-center gap-3 shrink-0">
-                          <div className="text-right">
-                            <span className="text-[10px] text-zinc-400 font-medium block">
-                              Paced buffer average
+                        <div className="p-4 border border-zinc-200 dark:border-zinc-800 rounded-xl bg-white dark:bg-zinc-900/60 shadow-xxs text-center">
+                          <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-medium">
+                            Met milestones
+                          </span>
+                          <span className="text-2xl font-bold text-zinc-900 dark:text-zinc-50 mt-1 block font-sans">
+                            {completedSubtasksCount}{" "}
+                            <span className="text-sm text-zinc-400 font-normal">
+                              of {totalSubtasksCount}
                             </span>
-                            <span className="text-lg font-bold font-sans">
-                              {avgConfidence}%
-                            </span>
-                          </div>
-                          <div className="w-1.5 h-10 bg-zinc-200 dark:bg-zinc-800 rounded-full overflow-hidden">
-                            <div
-                              className={`w-full h-full ${
-                                avgConfidence >= 75
-                                  ? "bg-emerald-500"
-                                  : avgConfidence >= 45
-                                    ? "bg-amber-500"
-                                    : "bg-rose-500"
-                              }`}
-                            />
-                          </div>
+                          </span>
+                          <p className="text-[10px] text-zinc-500 mt-1">
+                            Subtask pacing progress
+                          </p>
+                        </div>
+
+                        <div className="p-4 border border-zinc-200 dark:border-zinc-800 rounded-xl bg-white dark:bg-zinc-900/60 shadow-xxs text-center">
+                          <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-medium">
+                            Recovery assistance active
+                          </span>
+                          <span className="text-2xl font-bold text-zinc-900 dark:text-zinc-50 mt-1 block font-sans">
+                            {recoveryCount}
+                          </span>
+                          <p className="text-[10px] text-zinc-500 mt-1">
+                            Timeline safety actions
+                          </p>
                         </div>
                       </div>
-
-                      {/* Quick Summary Cards */}
-                      <div className="p-4 border border-zinc-200 dark:border-zinc-800 rounded-xl bg-white dark:bg-zinc-900/60 shadow-xxs text-center">
-                        <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-medium">
-                          Focus commitments
-                        </span>
-                        <span className="text-2xl font-bold text-zinc-900 dark:text-zinc-50 mt-1 block font-sans">
-                          {totalActive}
-                        </span>
-                        <p className="text-[10px] text-zinc-500 mt-1">
-                          Currently being managed
-                        </p>
-                      </div>
-
-                      <div className="p-4 border border-zinc-200 dark:border-zinc-800 rounded-xl bg-white dark:bg-zinc-900/60 shadow-xxs text-center">
-                        <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-medium">
-                          Met milestones
-                        </span>
-                        <span className="text-2xl font-bold text-zinc-900 dark:text-zinc-50 mt-1 block font-sans">
-                          {completedSubtasksCount}{" "}
-                          <span className="text-sm text-zinc-400 font-normal">
-                            of {totalSubtasksCount}
-                          </span>
-                        </span>
-                        <p className="text-[10px] text-zinc-500 mt-1">
-                          Subtask pacing progress
-                        </p>
-                      </div>
-
-                      <div className="p-4 border border-zinc-200 dark:border-zinc-800 rounded-xl bg-white dark:bg-zinc-900/60 shadow-xxs text-center">
-                        <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-medium">
-                          Recovery assistance active
-                        </span>
-                        <span className="text-2xl font-bold text-zinc-900 dark:text-zinc-50 mt-1 block font-sans">
-                          {recoveryCount}
-                        </span>
-                        <p className="text-[10px] text-zinc-500 mt-1">
-                          Timeline safety actions
-                        </p>
-                      </div>
-                    </div>
+                    </details>
 
                     {/* 5. Upcoming Deadlines Section */}
                     {nextDeadlines.length > 0 && (
@@ -3939,8 +3967,13 @@ export default function App() {
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {scoredTasks
-                          .sort((a, b) => b.analysis.score - a.analysis.score)
+                        {[...scoredTasks]
+                          .filter(t => !t.isCompleted)
+                          .sort((a, b) => {
+                            const diff = b.analysis.score - a.analysis.score;
+                            if (diff !== 0) return diff;
+                            return a.id.localeCompare(b.id);
+                          })
                           .map((task) => (
                             <TaskCard
                               key={task.id}
@@ -4141,30 +4174,6 @@ export default function App() {
             </motion.div>
           )}
 
-          {currentView === "activation" && (
-            <motion.div
-              key="activation"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              transition={{ duration: 0.2 }}
-              className="w-full flex-grow flex"
-            >
-              <div className="w-full bg-white dark:bg-zinc-950 p-6 md:p-10 rounded-2xl md:rounded-3xl shadow-sm border border-zinc-200/50 dark:border-zinc-800/50 relative overflow-hidden flex flex-col min-h-full mx-4 md:mx-0">
-                <ActivationCenter
-                  userId={user.uid}
-                  companionProfile={companionProfile}
-                  onExit={() => {
-                    setHasDismissedActivationPrompt(true);
-                    setCurrentView("workspace");
-                  }}
-                  tasks={tasks}
-                  onToggleSubtask={handleToggleSubtask}
-                />
-              </div>
-            </motion.div>
-          )}
-
           {currentView === "engagement" && (
             <motion.div
               key="engagement"
@@ -4177,53 +4186,16 @@ export default function App() {
               <div className="w-full bg-white dark:bg-zinc-950 p-6 md:p-10 rounded-2xl md:rounded-3xl shadow-sm border border-zinc-200/50 dark:border-zinc-800/50 relative overflow-hidden flex flex-col min-h-full mx-4 md:mx-0">
                 <EngagementInsights 
                   userId={user.uid} 
-                  onNavigateToBrain={() => setCurrentView("learning")}
-                />
-              </div>
-            </motion.div>
-          )}
-
-          {currentView === "learning" && (
-            <motion.div
-              key="learning"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              transition={{ duration: 0.2 }}
-              className="w-full flex-grow flex"
-            >
-              <div className="w-full bg-white dark:bg-zinc-950 p-6 md:p-10 rounded-2xl md:rounded-3xl shadow-sm border border-zinc-200/50 dark:border-zinc-800/50 relative overflow-hidden flex flex-col min-h-full mx-4 md:mx-0">
-                <LearningCenter userId={user.uid} />
-              </div>
-            </motion.div>
-          )}
-
-          {currentView === "adaptive" && (
-            <motion.div
-              key="adaptive"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              transition={{ duration: 0.2 }}
-              className="w-full flex-grow flex"
-            >
-              <div className="w-full max-w-5xl mx-auto flex flex-col min-h-full">
-                <AdaptivePlanningCenter
-                  userId={user.uid}
-                  tasks={tasks}
-                  learningProfile={null}
-                  onPlanGenerated={(updatedTasks) => {
-                    // Update all tasks with new subtasks/dates
-                    updatedTasks.forEach(t => {
-                      handleUpdateTask(t.id, { subtasks: t.subtasks });
-                    });
-                    triggerToast("Schedule optimally regenerated based on behavior.");
-                    setCurrentView("tasks");
+                  onNavigateToBrain={() => {
+                    setActiveSettingsTab("memory");
+                    setShowSettingsModal(true);
                   }}
                 />
               </div>
             </motion.div>
           )}
+
+
 
           {currentView === "tasks" && (
             <motion.div
@@ -4249,7 +4221,13 @@ export default function App() {
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3 w-full sm:w-auto">
+                  <div className="flex items-center gap-3 w-full sm:w-auto flex-wrap">
+                    <button
+                      onClick={() => setShowCompletedTasks(!showCompletedTasks)}
+                      className={`px-3 py-2 text-xs font-medium rounded-lg transition-colors border ${showCompletedTasks ? "bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800" : "bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 border-zinc-200 dark:border-zinc-800"}`}
+                    >
+                      {showCompletedTasks ? "Hide Completed" : "Show Completed"}
+                    </button>
                     <div className="relative flex-1 sm:w-64">
                       <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
                       <input
@@ -4393,7 +4371,7 @@ export default function App() {
                       </p>
                     </div>
                     <button
-                      onClick={() => setCurrentView("capture")}
+                      onClick={() => setCurrentView("planner")}
                       className="mt-2 px-6 py-3 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-950 font-bold rounded-xl shadow-sm hover:scale-105 active:scale-95 transition-all flex items-center gap-2 group"
                     >
                       <Plus className="w-4 h-4 group-hover:rotate-90 transition-transform" />
@@ -4404,6 +4382,7 @@ export default function App() {
                   <div className="grid grid-cols-1 md:grid-cols-[repeat(auto-fit,minmax(340px,1fr))] gap-6">
                     {tasks
                       .filter((task) => {
+                        if (!showCompletedTasks && task.isCompleted) return false;
                         const matchesSearch =
                           !tasksSearchQuery ||
                           task.title
@@ -4421,17 +4400,17 @@ export default function App() {
                       })
                       .sort((a, b) => {
                         if (tasksSortBy === "deadline") {
-                          return (
-                            new Date(a.deadline).getTime() -
-                            new Date(b.deadline).getTime()
-                          );
+                          const diff = new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
+                          if (diff !== 0) return diff;
+                          return a.id.localeCompare(b.id);
                         } else if (tasksSortBy === "risk") {
-                          return b.riskScore - a.riskScore;
+                          const diff = b.riskScore - a.riskScore;
+                          if (diff !== 0) return diff;
+                          return a.id.localeCompare(b.id);
                         } else {
-                          return (
-                            new Date(b.createdAt).getTime() -
-                            new Date(a.createdAt).getTime()
-                          );
+                          const diff = new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+                          if (diff !== 0) return diff;
+                          return a.id.localeCompare(b.id);
                         }
                       })
                       .map((task) => (
@@ -4475,22 +4454,30 @@ export default function App() {
 
       {/* Mobile Nav Floating Dock (Ultra-modern Capsule) */}
       {currentView !== "landing" && (
-        <div className="md:hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] bg-white/70 dark:bg-zinc-900/70 backdrop-blur-2xl p-2 rounded-[24px] border border-zinc-200/50 dark:border-zinc-800/50 shadow-[0_8px_32px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.4)] flex items-center gap-2">
+        <div className="md:hidden fixed bottom-4 left-4 right-4 z-[60] bg-white/80 dark:bg-zinc-900/80 backdrop-blur-2xl p-1.5 rounded-[32px] border border-zinc-200/50 dark:border-zinc-800/50 shadow-[0_8px_32px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.4)] flex items-center justify-between gap-1">
           {[
             { id: "workspace", icon: Activity, label: "Home" },
-            { id: "capture", icon: Brain, label: "Capture" },
-            { id: "planner", icon: CalendarDays, label: "Plan" },
-            { id: "tasks", icon: CheckSquare, label: "Execute" },
-            { id: "engagement", icon: Activity, label: "Insights" },
-            { id: "learning", icon: BrainCircuit, label: "Brain" },
+            { id: "tasks", icon: CheckSquare, label: "Tasks" },
+            { id: "planner", icon: Plus, label: "New" },
+            { id: "engagement", icon: BarChart, label: "Insights" },
+            { id: "more", icon: Menu, label: "More" },
           ].map((tab) => {
-            const isActive = currentView === tab.id;
+            const isActive = tab.id !== "more" ? currentView === tab.id : false;
             const Icon = tab.icon;
+            
+            const handleClick = () => {
+              if (tab.id === "more") {
+                setShowMobileMoreMenu(true);
+              } else {
+                setCurrentView(tab.id as any);
+              }
+            };
+
             return (
               <button
                 key={tab.id}
-                onClick={() => setCurrentView(tab.id as any)}
-                className={`relative w-12 h-12 flex flex-col items-center justify-center rounded-[18px] transition-all outline-none focus:outline-none ${
+                onClick={handleClick}
+                className={`relative flex-1 h-14 flex flex-col items-center justify-center rounded-[24px] transition-all outline-none focus:outline-none ${
                   isActive
                     ? "text-zinc-900 dark:text-zinc-100"
                     : "text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300"
@@ -4499,15 +4486,13 @@ export default function App() {
                 {isActive && (
                   <motion.div
                     layoutId="mobileNavIndicator"
-                    className="absolute inset-0 bg-white dark:bg-zinc-800 shadow-[0_2px_8px_rgba(0,0,0,0.08)] border border-zinc-200/40 dark:border-zinc-700/60 rounded-[18px] -z-10"
+                    className="absolute inset-0 bg-white dark:bg-zinc-800 shadow-[0_2px_8px_rgba(0,0,0,0.08)] border border-zinc-200/40 dark:border-zinc-700/60 rounded-[24px] -z-10"
                   />
                 )}
                 <Icon
-                  className={`w-5 h-5 transition-transform ${isActive ? "scale-110" : ""}`}
+                  className={`w-5 h-5 mb-1 transition-transform ${isActive ? "scale-110" : ""}`}
                 />
-                {isActive && (
-                  <div className="absolute bottom-1.5 w-1 h-1 rounded-full bg-zinc-900 dark:bg-zinc-100" />
-                )}
+                <span className="text-[10px] font-medium leading-none">{tab.label}</span>
               </button>
             );
           })}
@@ -4516,9 +4501,9 @@ export default function App() {
 
       {/* Floating Copilot Widget */}
       {currentView !== "landing" && (
-        <div className="fixed bottom-[104px] md:bottom-8 right-6 z-[70] flex flex-col items-end gap-4 pointer-events-none">
+        <div className="fixed bottom-[96px] md:bottom-8 right-4 md:right-6 z-[70] flex flex-col items-end gap-4 pointer-events-none">
           {isCopilotOpen && (
-            <div className="w-[380px] w-full max-w-[calc(100vw-48px)] h-[600px] max-h-[70vh] flex flex-col bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl border border-zinc-200/80 dark:border-zinc-800/80 rounded-3xl shadow-[0_20px_60px_-15px_rgba(0,0,0,0.2)] relative overflow-hidden transition-all animate-in zoom-in-95 pointer-events-auto origin-bottom-right">
+            <div className="w-[380px] max-w-[calc(100vw-32px)] h-[600px] max-h-[calc(100vh-140px)] md:max-h-[70vh] flex flex-col bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl border border-zinc-200/80 dark:border-zinc-800/80 rounded-3xl shadow-[0_20px_60px_-15px_rgba(0,0,0,0.2)] relative overflow-hidden transition-all animate-in zoom-in-95 pointer-events-auto origin-bottom-right">
               <AssistantPanel
                 activeTab={activeTab}
                 setActiveTab={setActiveTab}
@@ -4567,10 +4552,10 @@ export default function App() {
           )}
           <button
             onClick={() => setIsCopilotOpen(!isCopilotOpen)}
-            className={`md:h-12 md:w-auto md:px-5 w-12 h-12 rounded-full shadow-sm backdrop-blur-xl transition-all flex items-center justify-center gap-2.5 pointer-events-auto group overflow-hidden border ${
+            className={`md:h-12 md:w-auto md:px-5 h-12 px-4 rounded-full shadow-lg backdrop-blur-xl transition-all flex items-center justify-center gap-2.5 pointer-events-auto group overflow-hidden border ${
               isCopilotOpen
                 ? "bg-zinc-200/80 dark:bg-zinc-800/80 text-zinc-900 dark:text-zinc-100 border-zinc-300/50 dark:border-zinc-700/50 hover:bg-zinc-300 dark:hover:bg-zinc-700"
-                : "bg-white/80 dark:bg-zinc-900/80 text-zinc-900 dark:text-white border-zinc-200/50 dark:border-zinc-800/50 hover:bg-white dark:hover:bg-zinc-900 hover:scale-105 active:scale-95"
+                : "bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 border-zinc-800 dark:border-zinc-200 shadow-xl hover:scale-105 active:scale-95"
             }`}
           >
             {isCopilotOpen ? (
@@ -4578,9 +4563,9 @@ export default function App() {
             ) : (
               <>
                 <div className="relative flex items-center justify-center shrink-0">
-                  <Sparkles className="w-4 h-4 text-zinc-600 dark:text-zinc-400 relative z-10 transition-transform group-hover:scale-110" />
+                  <Sparkles className="w-4 h-4 text-white dark:text-zinc-900 relative z-10 transition-transform group-hover:scale-110" />
                 </div>
-                <span className="hidden md:block font-bold tracking-tight text-sm text-zinc-900 dark:text-zinc-100">
+                <span className="font-bold tracking-tight text-sm text-white dark:text-zinc-900">
                   Saarthi AI
                 </span>
               </>
@@ -4631,6 +4616,85 @@ export default function App() {
         onImportCommitments={handleImportExtractedCommitments}
       />
 
+      {/* Activation Engine Modal */}
+      <AnimatePresence>
+        {isActivationModalOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 sm:p-6"
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white dark:bg-zinc-950 rounded-3xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col relative"
+            >
+              <button
+                onClick={() => setIsActivationModalOpen(false)}
+                className="absolute top-4 right-4 z-10 p-2 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 bg-white/50 dark:bg-zinc-900/50 hover:bg-white dark:hover:bg-zinc-800 rounded-full backdrop-blur-md transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+              <div className="flex-1 overflow-y-auto">
+                <ActivationCenter
+                  userId={user?.uid || ""}
+                  companionProfile={companionProfile}
+                  onExit={() => {
+                    setHasDismissedActivationPrompt(true);
+                    setIsActivationModalOpen(false);
+                  }}
+                  tasks={tasks}
+                  onToggleSubtask={handleToggleSubtask}
+                />
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Adaptive Planning Modal */}
+      <AnimatePresence>
+        {isAdaptiveModalOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 sm:p-6"
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white dark:bg-zinc-950 rounded-3xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col relative"
+            >
+              <button
+                onClick={() => setIsAdaptiveModalOpen(false)}
+                className="absolute top-4 right-4 z-10 p-2 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 bg-white/50 dark:bg-zinc-900/50 hover:bg-white dark:hover:bg-zinc-800 rounded-full backdrop-blur-md transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+              <div className="flex-1 overflow-y-auto">
+                <AdaptivePlanningCenter
+                  userId={user?.uid || ""}
+                  tasks={tasks}
+                  learningProfile={null}
+                  onPlanGenerated={(updatedTasks) => {
+                    // Update all tasks with new subtasks/dates
+                    updatedTasks.forEach((t) => {
+                      handleUpdateTask(t.id, { subtasks: t.subtasks });
+                    });
+                    triggerToast("Schedule optimally regenerated based on behavior.");
+                    setIsAdaptiveModalOpen(false);
+                  }}
+                />
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {showOnboarding && user && (
         <CompanionOnboarding
           userId={user.uid}
@@ -4640,6 +4704,91 @@ export default function App() {
           }}
         />
       )}
+
+      {/* Mobile More Menu (Bottom Sheet) */}
+      <AnimatePresence>
+        {showMobileMoreMenu && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowMobileMoreMenu(false)}
+              className="fixed inset-0 bg-black/40 dark:bg-black/60 z-[80] md:hidden backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 300 }}
+              className="fixed bottom-0 left-0 right-0 z-[90] bg-white dark:bg-zinc-950 rounded-t-3xl border-t border-zinc-200/50 dark:border-zinc-800/50 shadow-2xl md:hidden overflow-hidden flex flex-col max-h-[85vh]"
+            >
+              <div className="flex-shrink-0 flex justify-center pt-3 pb-2">
+                <div className="w-12 h-1.5 bg-zinc-200 dark:bg-zinc-800 rounded-full" />
+              </div>
+              
+              <div className="px-6 pb-4 flex items-center gap-3">
+                {user?.photoURL ? (
+                  <img
+                    src={user.photoURL}
+                    alt="pfp"
+                    className="w-12 h-12 rounded-full ring-2 ring-zinc-200 dark:ring-zinc-800 shadow-sm"
+                  />
+                ) : (
+                  <div className="w-12 h-12 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-600 dark:text-zinc-300 ring-2 ring-zinc-200 dark:ring-zinc-800 shadow-sm">
+                    <UserIcon className="w-6 h-6" />
+                  </div>
+                )}
+                <div>
+                  <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">{user?.displayName || "Warrior"}</h3>
+                  <p className="text-xs text-zinc-500">{user?.email}</p>
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto px-4 pb-8 space-y-2">
+                {[
+                  { id: "settings", icon: Settings, label: "Settings", desc: "App & AI Configuration", onClick: () => {
+                    setActiveSettingsTab("api");
+                    setShowSettingsModal(true);
+                    setShowMobileMoreMenu(false);
+                  } },
+                  { id: "theme", icon: theme === "dark" ? Sun : Moon, label: "Theme", desc: "Toggle visual style", onClick: () => {
+                    setTheme((prev) => prev === "dark" ? "light" : "dark");
+                    setShowMobileMoreMenu(false);
+                  } },
+                ].map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={item.onClick}
+                    className="w-full flex items-center gap-4 p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-900/50 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors text-left"
+                  >
+                    <div className="w-10 h-10 rounded-xl bg-white dark:bg-zinc-800 flex items-center justify-center shadow-sm">
+                      <item.icon className="w-5 h-5 text-zinc-700 dark:text-zinc-300" />
+                    </div>
+                    <div>
+                      <div className="font-bold text-zinc-900 dark:text-zinc-100">{item.label}</div>
+                      <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">{item.desc}</div>
+                    </div>
+                  </button>
+                ))}
+
+                <button
+                  onClick={() => {
+                    handleLogout();
+                    setShowMobileMoreMenu(false);
+                  }}
+                  className="w-full flex items-center gap-4 p-4 rounded-2xl bg-red-50 dark:bg-red-950/20 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors text-left mt-4"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-white dark:bg-zinc-800 flex items-center justify-center shadow-sm">
+                    <LogOut className="w-5 h-5 text-red-600 dark:text-red-400" />
+                  </div>
+                  <div className="font-bold text-red-600 dark:text-red-400">Sign Out</div>
+                </button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

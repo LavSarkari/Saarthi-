@@ -102,10 +102,10 @@ export default function EngagementInsights({ userId, onNavigateToBrain }: Engage
         <div>
           <h1 className="text-3xl md:text-4xl font-black tracking-tight text-zinc-900 dark:text-zinc-50 flex items-center gap-3 font-display">
             <Sparkles className="h-8 w-8 text-indigo-500" />
-            Insights
+            Progress
           </h1>
           <p className="text-base text-zinc-500 dark:text-zinc-400 mt-3 max-w-xl leading-relaxed">
-            What Saarthi has learned about you recently. This is a living reflection of your habits and execution patterns.
+            What your AI has learned about your workflow recently. Use this to track your momentum and habits.
           </p>
         </div>
         <button
@@ -131,28 +131,35 @@ export default function EngagementInsights({ userId, onNavigateToBrain }: Engage
         </div>
       </div>
 
-      {/* Narrative Discoveries */}
-      <div className="space-y-6">
+      {/* Narrative Discoveries Feed */}
+      <div className="space-y-4 sm:space-y-6">
         {recentActions.length > 0 ? (
           recentActions.map((action, idx) => (
-            <motion.div 
+            <details 
               key={idx}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: idx * 0.1 }}
-              className="group bg-white dark:bg-zinc-900 border border-zinc-200/50 dark:border-zinc-800/50 p-6 rounded-2xl flex flex-col md:flex-row gap-6 shadow-sm"
+              className="group bg-white dark:bg-zinc-900 border border-zinc-200/50 dark:border-zinc-800/50 rounded-2xl shadow-sm overflow-hidden [&_summary::-webkit-details-marker]:hidden"
             >
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-500 bg-indigo-50 dark:bg-indigo-500/10 px-2 py-1 rounded-md">{action.system}</span>
+              <summary className="p-5 sm:p-6 flex items-start gap-4 cursor-pointer outline-none select-none">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-500 bg-indigo-50 dark:bg-indigo-500/10 px-2 py-1 rounded-md">{action.system}</span>
+                    <span className="text-[10px] font-medium text-zinc-400">Just now</span>
+                  </div>
+                  <h3 className="text-lg sm:text-xl font-medium text-zinc-900 dark:text-zinc-100 leading-snug pr-6">{action.action}</h3>
                 </div>
-                <h3 className="text-xl font-medium text-zinc-900 dark:text-zinc-100 mb-2">{action.action}</h3>
-                <p className="text-sm text-zinc-500 dark:text-zinc-400 flex items-start gap-2">
-                  <ArrowRight className="w-4 h-4 mt-0.5 shrink-0 text-zinc-400" />
+                <div className="shrink-0 mt-1">
+                  <div className="w-8 h-8 rounded-full bg-zinc-50 dark:bg-zinc-800/50 flex items-center justify-center group-open:rotate-180 transition-transform">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-zinc-400"><path d="m6 9 6 6 6-6"/></svg>
+                  </div>
+                </div>
+              </summary>
+              <div className="px-5 sm:px-6 pb-5 sm:pb-6 pt-2 border-t border-zinc-100 dark:border-zinc-800/50 bg-zinc-50/50 dark:bg-zinc-900/50">
+                <p className="text-sm text-zinc-600 dark:text-zinc-300 flex items-start gap-2 leading-relaxed">
+                  <Info className="w-4 h-4 mt-0.5 shrink-0 text-indigo-400" />
                   {action.reason}
                 </p>
               </div>
-            </motion.div>
+            </details>
           ))
         ) : (
           <div className="text-center py-20 border border-dashed border-zinc-200 dark:border-zinc-800 rounded-3xl">
@@ -162,29 +169,6 @@ export default function EngagementInsights({ userId, onNavigateToBrain }: Engage
           </div>
         )}
       </div>
-
-      {/* Learning Timeline */}
-      {recentActions.length > 0 && (
-        <div className="pt-12 border-t border-zinc-200 dark:border-zinc-800/50 mt-12">
-          <h2 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100 mb-8">Learning Timeline</h2>
-          <div className="space-y-8 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-zinc-200 dark:before:via-zinc-800 before:to-transparent">
-            {recentActions.map((action, idx) => (
-              <div key={idx} className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
-                <div className="flex items-center justify-center w-10 h-10 rounded-full border-4 border-white dark:border-zinc-950 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400 shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 shadow-sm z-10">
-                  <Check className="w-4 h-4" />
-                </div>
-                <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] bg-white dark:bg-zinc-900 p-5 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm">
-                  <div className="flex items-center justify-between mb-1">
-                    <h4 className="font-bold text-zinc-900 dark:text-zinc-100 text-sm">Updated {action.system}</h4>
-                    <span className="text-xs font-medium text-zinc-500">Recently</span>
-                  </div>
-                  <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">{action.reason}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       {onNavigateToBrain && (
         <div className="pt-8 flex justify-center">

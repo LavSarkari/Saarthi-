@@ -17,12 +17,14 @@ import {
   RefreshCw,
   LogOut,
   HeartHandshake,
+  Brain,
 } from "lucide-react";
 import CompanionCenter from "./CompanionCenter";
 import RecoveryCenter from "./RecoveryCenter";
+import LearningCenter from "./LearningCenter";
 import { CompanionProfile } from "../types";
 
-export type SettingsTab = "api" | "telegram" | "companion" | "recovery";
+export type SettingsTab = "api" | "telegram" | "companion" | "recovery" | "memory";
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -87,15 +89,23 @@ export default function SettingsModal({
   );
   const [localTgSlots, setLocalTgSlots] =
     React.useState<string[]>(telegramAlertSlots);
+    
+  const [mobileView, setMobileView] = React.useState<"list" | "detail">("list");
 
   React.useEffect(() => {
     if (isOpen) {
       setLocalTgEnabled(telegramAlertsEnabled);
       setLocalTgSlots(telegramAlertSlots);
+      setMobileView("list");
     }
   }, [isOpen, telegramAlertsEnabled, telegramAlertSlots]);
 
   if (!isOpen) return null;
+
+  const handleTabSelect = (tab: SettingsTab) => {
+    setActiveTab(tab);
+    setMobileView("detail");
+  };
 
   return (
     <AnimatePresence>
@@ -108,72 +118,122 @@ export default function SettingsModal({
           transition={{ type: "spring", stiffness: 400, damping: 30 }}
           className="relative z-10 bg-zinc-50 dark:bg-[#0a0a0a] w-full h-full max-w-full rounded-none flex flex-col md:flex-row overflow-hidden border-0"
         >
-          {/* Left Sidebar (Desktop) / Top Nav (Mobile) */}
-          <div className="w-full md:w-64 bg-zinc-100 dark:bg-[#121212] flex-shrink-0 border-b md:border-b-0 md:border-r border-zinc-200 dark:border-zinc-800 py-4 md:py-8 px-4 flex flex-row md:flex-col overflow-x-auto md:overflow-y-auto gap-2 md:gap-1">
-            <h2 className="hidden md:block px-3 text-[11px] font-black text-zinc-500 dark:text-zinc-400 uppercase tracking-widest mb-2 mt-2">
-              Configuration
-            </h2>
+          {/* Left Sidebar (Desktop) / Native List (Mobile) */}
+          <div className={`w-full md:w-64 bg-zinc-100/50 dark:bg-[#121212] flex-shrink-0 md:border-r border-zinc-200 dark:border-zinc-800 flex flex-col overflow-y-auto ${mobileView === "detail" ? "hidden md:flex" : "flex"}`}>
+            <div className="flex items-center justify-between p-4 md:hidden border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#0a0a0a] sticky top-0 z-10">
+              <span className="font-semibold text-zinc-900 dark:text-zinc-100">Settings</span>
+              <button onClick={onClose} className="p-2 -mr-2 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="p-4 md:p-4 space-y-6 md:space-y-1">
+              <div className="space-y-2 md:space-y-1">
+                <h2 className="px-3 text-xs md:text-[11px] font-semibold md:font-black text-zinc-500 dark:text-zinc-400 uppercase tracking-widest mb-1 md:mb-2 md:mt-2">
+                  Configuration
+                </h2>
+                <div className="bg-white dark:bg-[#0a0a0a] md:bg-transparent rounded-2xl md:rounded-none overflow-hidden border border-zinc-200/50 dark:border-zinc-800/50 md:border-0 shadow-sm md:shadow-none divide-y divide-zinc-100 dark:divide-zinc-800/50 md:divide-none">
+                  <button
+                    onClick={() => handleTabSelect("api")}
+                    className={`w-full flex items-center justify-between md:justify-start gap-3 px-4 md:px-3 py-3.5 md:py-2.5 md:rounded-lg text-[15px] md:text-sm font-medium md:font-semibold transition-colors ${
+                      activeTab === "api"
+                        ? "md:bg-white md:dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 md:shadow-sm"
+                        : "text-zinc-700 dark:text-zinc-300 md:text-zinc-600 md:dark:text-zinc-400 hover:bg-zinc-50 md:hover:bg-zinc-200/50 dark:hover:bg-zinc-900 md:dark:hover:bg-zinc-800/50"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-7 h-7 md:w-auto md:h-auto rounded-lg bg-indigo-50 md:bg-transparent text-indigo-600 md:text-inherit flex items-center justify-center shrink-0">
+                        <Zap className="w-4 h-4" />
+                      </div>
+                      AI Engine
+                    </div>
+                    <ExternalLink className="w-4 h-4 text-zinc-300 md:hidden" />
+                  </button>
+                  <button
+                    onClick={() => handleTabSelect("telegram")}
+                    className={`w-full flex items-center justify-between md:justify-start gap-3 px-4 md:px-3 py-3.5 md:py-2.5 md:rounded-lg text-[15px] md:text-sm font-medium md:font-semibold transition-colors ${
+                      activeTab === "telegram"
+                        ? "md:bg-white md:dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 md:shadow-sm"
+                        : "text-zinc-700 dark:text-zinc-300 md:text-zinc-600 md:dark:text-zinc-400 hover:bg-zinc-50 md:hover:bg-zinc-200/50 dark:hover:bg-zinc-900 md:dark:hover:bg-zinc-800/50"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-7 h-7 md:w-auto md:h-auto rounded-lg bg-[#24A1DE]/10 md:bg-transparent text-[#24A1DE] md:text-inherit flex items-center justify-center shrink-0">
+                        <ExternalLink className="w-4 h-4" />
+                      </div>
+                      Integrations
+                    </div>
+                    <ExternalLink className="w-4 h-4 text-zinc-300 md:hidden" />
+                  </button>
+                </div>
+              </div>
 
-            <button
-              onClick={() => setActiveTab("api")}
-              className={`flex-shrink-0 flex items-center justify-center md:justify-start gap-3 px-4 md:px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors ${
-                activeTab === "api"
-                  ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-sm md:shadow-none"
-                  : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200/50 dark:hover:bg-zinc-800/50"
-              }`}
-            >
-              <Zap className="w-4 h-4" />
-              AI Engine
-            </button>
-            <button
-              onClick={() => setActiveTab("telegram")}
-              className={`flex-shrink-0 flex items-center justify-center md:justify-start gap-3 px-4 md:px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors ${
-                activeTab === "telegram"
-                  ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-sm md:shadow-none"
-                  : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200/50 dark:hover:bg-zinc-800/50"
-              }`}
-            >
-              <ExternalLink className="w-4 h-4" />
-              Integrations
-            </button>
-
-            <h2 className="hidden md:block px-3 text-[11px] font-black text-zinc-500 dark:text-zinc-400 uppercase tracking-widest mb-2 mt-4">
-              Behavior & OS
-            </h2>
-            <button
-              onClick={() => setActiveTab("companion")}
-              className={`flex-shrink-0 flex items-center justify-center md:justify-start gap-3 px-4 md:px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors ${
-                activeTab === "companion"
-                  ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-sm md:shadow-none"
-                  : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200/50 dark:hover:bg-zinc-800/50"
-              }`}
-            >
-              <Bot className="w-4 h-4" />
-              Coach Persona
-            </button>
-            <button
-              onClick={() => setActiveTab("recovery")}
-              className={`flex-shrink-0 flex items-center justify-center md:justify-start gap-3 px-4 md:px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors ${
-                activeTab === "recovery"
-                  ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-sm md:shadow-none"
-                  : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200/50 dark:hover:bg-zinc-800/50"
-              }`}
-            >
-              <HeartHandshake className="w-4 h-4" />
-              Recovery System
-            </button>
-
-            <div className="md:hidden flex-1" />
-            <button
-              onClick={onClose}
-              className="md:hidden flex-shrink-0 flex items-center justify-center p-2.5 rounded-lg text-zinc-500 hover:bg-zinc-200/50 dark:hover:bg-zinc-800/50"
-            >
-              <X className="w-5 h-5" />
-            </button>
+              <div className="space-y-2 md:space-y-1">
+                <h2 className="px-3 text-xs md:text-[11px] font-semibold md:font-black text-zinc-500 dark:text-zinc-400 uppercase tracking-widest mb-1 md:mb-2 md:mt-4">
+                  Behavior & OS
+                </h2>
+                <div className="bg-white dark:bg-[#0a0a0a] md:bg-transparent rounded-2xl md:rounded-none overflow-hidden border border-zinc-200/50 dark:border-zinc-800/50 md:border-0 shadow-sm md:shadow-none divide-y divide-zinc-100 dark:divide-zinc-800/50 md:divide-none">
+                  <button
+                    onClick={() => handleTabSelect("memory")}
+                    className={`w-full flex items-center justify-between md:justify-start gap-3 px-4 md:px-3 py-3.5 md:py-2.5 md:rounded-lg text-[15px] md:text-sm font-medium md:font-semibold transition-colors ${
+                      activeTab === "memory"
+                        ? "md:bg-white md:dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 md:shadow-sm"
+                        : "text-zinc-700 dark:text-zinc-300 md:text-zinc-600 md:dark:text-zinc-400 hover:bg-zinc-50 md:hover:bg-zinc-200/50 dark:hover:bg-zinc-900 md:dark:hover:bg-zinc-800/50"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-7 h-7 md:w-auto md:h-auto rounded-lg bg-emerald-50 md:bg-transparent text-emerald-600 md:text-inherit flex items-center justify-center shrink-0">
+                        <Brain className="w-4 h-4" />
+                      </div>
+                      AI Memory
+                    </div>
+                    <ExternalLink className="w-4 h-4 text-zinc-300 md:hidden" />
+                  </button>
+                  <button
+                    onClick={() => handleTabSelect("companion")}
+                    className={`w-full flex items-center justify-between md:justify-start gap-3 px-4 md:px-3 py-3.5 md:py-2.5 md:rounded-lg text-[15px] md:text-sm font-medium md:font-semibold transition-colors ${
+                      activeTab === "companion"
+                        ? "md:bg-white md:dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 md:shadow-sm"
+                        : "text-zinc-700 dark:text-zinc-300 md:text-zinc-600 md:dark:text-zinc-400 hover:bg-zinc-50 md:hover:bg-zinc-200/50 dark:hover:bg-zinc-900 md:dark:hover:bg-zinc-800/50"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-7 h-7 md:w-auto md:h-auto rounded-lg bg-amber-50 md:bg-transparent text-amber-600 md:text-inherit flex items-center justify-center shrink-0">
+                        <Bot className="w-4 h-4" />
+                      </div>
+                      Coach Persona
+                    </div>
+                    <ExternalLink className="w-4 h-4 text-zinc-300 md:hidden" />
+                  </button>
+                  <button
+                    onClick={() => handleTabSelect("recovery")}
+                    className={`w-full flex items-center justify-between md:justify-start gap-3 px-4 md:px-3 py-3.5 md:py-2.5 md:rounded-lg text-[15px] md:text-sm font-medium md:font-semibold transition-colors ${
+                      activeTab === "recovery"
+                        ? "md:bg-white md:dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 md:shadow-sm"
+                        : "text-zinc-700 dark:text-zinc-300 md:text-zinc-600 md:dark:text-zinc-400 hover:bg-zinc-50 md:hover:bg-zinc-200/50 dark:hover:bg-zinc-900 md:dark:hover:bg-zinc-800/50"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-7 h-7 md:w-auto md:h-auto rounded-lg bg-rose-50 md:bg-transparent text-rose-600 md:text-inherit flex items-center justify-center shrink-0">
+                        <HeartHandshake className="w-4 h-4" />
+                      </div>
+                      Recovery System
+                    </div>
+                    <ExternalLink className="w-4 h-4 text-zinc-300 md:hidden" />
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
 
-          {/* Right Content Area */}
-          <div className="flex-1 bg-white dark:bg-[#0a0a0a] relative flex flex-col h-full overflow-y-auto">
+          {/* Right Content Area (Detail View) */}
+          <div className={`flex-1 bg-white dark:bg-[#0a0a0a] relative flex flex-col h-full overflow-y-auto ${mobileView === "list" ? "hidden md:flex" : "flex"}`}>
+            <div className="md:hidden flex items-center justify-between p-4 border-b border-zinc-200 dark:border-zinc-800 sticky top-0 bg-white dark:bg-[#0a0a0a] z-20">
+              <button onClick={() => setMobileView("list")} className="flex items-center gap-1 text-indigo-600 dark:text-indigo-400 font-medium -ml-2 p-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+                Settings
+              </button>
+            </div>
             <button
               onClick={onClose}
               className="hidden md:flex absolute top-8 right-8 p-2 rounded-full border-2 border-zinc-300 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors flex-col items-center gap-1 group z-10"
@@ -594,6 +654,32 @@ export default function SettingsModal({
                       onUpdateProfile={onUpdateCompanionProfile}
                       inline={true}
                     />
+                  </motion.div>
+                )}
+
+                {activeTab === "memory" && (
+                  <motion.div
+                    key="memory-panel"
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    transition={{ duration: 0.15 }}
+                  >
+                    {userId ? (
+                      <LearningCenter
+                        userId={userId}
+                      />
+                    ) : (
+                      <div className="flex flex-col items-center justify-center py-20">
+                        <Brain className="w-12 h-12 text-zinc-300 dark:text-zinc-700 mb-4" />
+                        <h3 className="text-xl font-bold text-zinc-900 dark:text-zinc-100">
+                          Sign in required
+                        </h3>
+                        <p className="text-zinc-500 dark:text-zinc-400 mt-2">
+                          You must be logged in to view AI Memory.
+                        </p>
+                      </div>
+                    )}
                   </motion.div>
                 )}
 
