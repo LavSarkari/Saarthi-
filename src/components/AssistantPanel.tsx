@@ -156,7 +156,7 @@ export default function AssistantPanel({
           }`}
         >
           <Sparkles className="w-3.5 h-3.5" />
-          <span>Chat Copilot</span>
+          <span>Chat AI</span>
         </button>
 
         <button

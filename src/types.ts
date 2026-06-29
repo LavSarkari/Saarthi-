@@ -1,5 +1,7 @@
 export type RiskZone = "safe" | "watch" | "critical";
 
+export type PlanningStrategy = "balanced" | "deep_work" | "deadline_first" | "energy_optimized" | "recovery_optimized" | "sprint_mode" | "minimal_survival";
+
 export interface Subtask {
   id: string;
   title: string;
@@ -8,6 +10,9 @@ export interface Subtask {
   order: number;
   googleEventId?: string;
   syncError?: string;
+  scheduledStart?: string;
+  scheduledEnd?: string;
+  adaptiveExplanation?: string;
 }
 
 export interface ReminderContext {
@@ -31,7 +36,9 @@ export interface Task {
   title: string;
   description: string;
   complexity: "low" | "medium" | "high";
+  priority?: "low" | "medium" | "high";
   totalEffortMinutes: number;
+  effortEstimateMinutes?: number;
   riskScore: number;
   riskZone: RiskZone;
   deadline: string;
@@ -50,7 +57,56 @@ export interface Task {
     advice: string;
   };
   reminderContext?: ReminderContext;
+  labels?: string[];
+  notes?: string;
+  context?: string;
   lastUpdated?: number;
+  // Used by Activation Engine to mark tasks as "stuck"
+  isStuck?: boolean;
+}
+
+export type RecoveryMode = "minimal" | "balanced" | "maximum" | "wellness";
+
+export interface SuggestedTradeoff {
+  taskId: string;
+  originalTitle: string;
+  proposedAction: "reduce_scope" | "delay" | "split" | "skip" | "compress";
+  explanation: string;
+  newDeadline?: string;
+  newTitle?: string;
+  effortSavedMinutes: number;
+}
+
+export interface RebuiltTask {
+  taskId: string;
+  title: string;
+  newDeadline: string;
+  priority: "low" | "medium" | "high";
+  action: "keep" | "move" | "modify";
+  notes?: string;
+}
+
+export interface AIRecoveryPlan {
+  id: string;
+  userId: string;
+  createdAt: string;
+  mode: RecoveryMode;
+  situationSummary: {
+    whatHappened: string;
+    why: string;
+    message: string;
+  };
+  criticalCommitments: string[];
+  flexibleCommitments: string[];
+  suggestedTradeoffs: SuggestedTradeoff[];
+  newWeeklyPlan: RebuiltTask[];
+  expectedRecovery: {
+    confidenceBefore: number;
+    confidenceAfter: number;
+    timeRecoveredHours: number;
+    stressReductionEstimate: "low" | "medium" | "high";
+  };
+  status: "proposed" | "accepted" | "rejected";
 }
 
 export interface ChatMessage {
@@ -67,3 +123,171 @@ export interface OCRExtractedCommitment {
   estimatedMinutes: number;
   confidence: number;
 }
+
+export interface ActivationSession {
+  id: string;
+  userId: string;
+  taskId: string;
+  subtaskId?: string; // Optional if targeting a specific subtask
+  microMissionTitle: string; // "Read first page"
+  estimatedMinutes: number;
+  status: "pending" | "active" | "completed" | "failed" | "snoozed";
+  startedAt?: string;
+  completedAt?: string;
+  createdAt: string;
+  shrinkLevel: number; // How many times it was made "smaller"
+}
+
+export interface UserAnalytics {
+  userId: string;
+  activationSessionsCompleted: number;
+  microTasksCompleted: number;
+  averageActivationTimeSeconds: number;
+  largestTaskReducedToMicro: number;
+  procrastinationRecoveredCount: number;
+  focusMinutesTotal: number;
+  currentStreak: number;
+  momentumScore: number;
+  lastActivationDate?: string;
+  todayWins: number;
+  timeSavedMinutes: number;
+}
+
+export type BehaviourState = 
+  | "highly_engaged" 
+  | "building_momentum" 
+  | "passive" 
+  | "overwhelmed" 
+  | "burned_out" 
+  | "deadline_crisis";
+
+export interface NotificationLog {
+  id: string;
+  timestamp: string;
+  type: string; // e.g., "activation_prompt", "standard_reminder", "pacing_alert"
+  status: "sent" | "engaged" | "ignored" | "dismissed";
+  engagedAt?: string;
+}
+
+export type CompanionType = "guardian" | "commander" | "strategist" | "mentor" | "challenger";
+
+export interface CompanionProfile {
+  userId: string;
+  activeCompanion: CompanionType;
+  coachingStyle: string; // e.g., "supportive", "direct", "analytical"
+  motivationStyle: string; // e.g., "gentle", "high_accountability", "educational"
+  communicationDensity: "low" | "medium" | "high";
+  celebrationStyle: "minimal" | "enthusiastic" | "analytical" | "aggressive";
+  pressureTolerance: "low" | "medium" | "high";
+  // Analytics
+  companionEffectiveness: number; // 0-100
+  recentAdaptations: string[];
+}
+
+export interface UserEngagement {
+  userId: string;
+  engagementScore: number; // 0 to 100
+  behaviourState: BehaviourState;
+  engagementHistory: { timestamp: string; score: number }[];
+  notificationHistory: NotificationLog[];
+  notificationAcceptanceRate: number; // percentage
+  averageResponseDelaySeconds: number;
+  quietHours: {
+    enabled: boolean;
+    start: string; // e.g. "22:00"
+    end: string;   // e.g. "08:00"
+  };
+  burnoutSignals: string[]; // ISO timestamps of overload signals
+  focusConsistency: number; // 0 to 100 score on task completion pattern
+  consecutiveIgnoredCount: number; // tracker for back-off delay logic
+  nextAllowedNotificationTime?: string; // back-off lock
+  lastInteractionTime?: string;
+}
+
+export type BehavioralEventType =
+  | "TASK_CREATED"
+  | "TASK_STARTED"
+  | "TASK_COMPLETED"
+  | "TASK_FAILED"
+  | "TASK_SNOOZED"
+  | "TASK_DELETED"
+  | "RECOVERY_ACCEPTED"
+  | "RECOVERY_REJECTED"
+  | "TELEGRAM_REPLY"
+  | "TELEGRAM_IGNORE"
+  | "VOICE_CONVERSATION"
+  | "DASHBOARD_SESSION"
+  | "FOCUS_SESSION_STARTED"
+  | "FOCUS_SESSION_COMPLETED"
+  | "CALENDAR_SYNC"
+  | "OCR_IMPORT"
+  | "MORNING_BRIEF_VIEWED"
+  | "EVENING_REFLECTION_VIEWED"
+  | "ACTIVATION_STARTED"
+  | "ACTIVATION_COMPLETED"
+  | "ACTIVATION_ABANDONED";
+
+export interface BehavioralEvent {
+  id: string;
+  userId: string;
+  timestamp: string;
+  eventType: BehavioralEventType;
+  taskCategory?: string;
+  subject?: string;
+  durationMinutes?: number;
+  completionState?: "success" | "partial" | "failed" | "abandoned";
+  confidence?: number;
+  metadata?: Record<string, any>;
+}
+
+export interface LearnedAttribute {
+  value: any;
+  confidence: number;
+  evidenceCount: number;
+  lastUpdated: string;
+  source: string;
+}
+
+export interface AdaptivePlanningState {
+  currentStrategy: PlanningStrategy;
+  planningAccuracy: number;
+  estimateAccuracy: number;
+  adaptiveImprovements: number;
+  recoveredHours: number;
+  planningConfidence: number;
+  historicalSuccess: number;
+  averageScheduleStability: number;
+  behaviorInfluence: number;
+  lastOptimized: string;
+}
+
+export interface LearningProfile {
+  userId: string;
+  preferredWorkHours?: LearnedAttribute;
+  preferredStudyWindow?: LearnedAttribute;
+  mostProductiveWeekday?: LearnedAttribute;
+  averageFocusDurationMinutes?: LearnedAttribute;
+  longestSuccessfulFocusDurationMinutes?: LearnedAttribute;
+  averageBreakDurationMinutes?: LearnedAttribute;
+  averageCompletionConfidence?: LearnedAttribute;
+  averageEstimationErrorPercent?: LearnedAttribute;
+  averageProcrastinationDelayDays?: LearnedAttribute;
+  mostDelayedSubject?: LearnedAttribute;
+  mostDelayedProject?: LearnedAttribute;
+  mostSuccessfulCategory?: LearnedAttribute;
+  mostSuccessfulTaskSize?: LearnedAttribute;
+  averageDailyWorkloadMinutes?: LearnedAttribute;
+  preferredWorkloadDensity?: LearnedAttribute;
+  preferredCoachingStyle?: LearnedAttribute;
+  preferredCommunicationStyle?: LearnedAttribute;
+  preferredRecoveryMode?: LearnedAttribute;
+  responseRateTelegram?: LearnedAttribute;
+  responseRateVoice?: LearnedAttribute;
+  recoverySuccessRate?: LearnedAttribute;
+  riskTolerance?: LearnedAttribute;
+  sleepSchedule?: LearnedAttribute;
+  weeklyConsistencyScore?: LearnedAttribute;
+  learningConfidence: number;
+  lastUpdated: string;
+}
+

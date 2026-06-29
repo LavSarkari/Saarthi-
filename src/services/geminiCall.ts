@@ -52,9 +52,9 @@ export async function generateContentWithRetryAndFallback(
         `Gemini call failed (attempt ${attempts}/${maxRetries + 1}) for model ${currentModel}. Error: ${errorMessage}. Status: ${errorStatus}. Code: ${errorCode}`
       );
 
-      // If it's a complex model (gemini-3.1-pro-preview) and it failed, immediately fallback to gemini-3.1-flash-lite
-      if (currentModel === "gemini-3.1-pro-preview") {
-        console.warn(`Falling back from gemini-3.1-pro-preview to gemini-3.1-flash-lite due to error.`);
+      // If it's a complex model and it failed, immediately fallback to gemini-3.1-flash-lite
+      if (currentModel === "gemini-3.1-pro-preview" || currentModel === "gemini-2.5-flash" || currentModel === "gemini-3.5-flash") {
+        console.warn(`Falling back from ${currentModel} to gemini-3.1-flash-lite due to error.`);
         currentModel = "gemini-3.1-flash-lite";
         // Remove thinking config as gemini-3.1-flash-lite doesn't need/support it or to avoid extra quota usage
         if (currentConfig.thinkingConfig) {

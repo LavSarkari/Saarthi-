@@ -14,14 +14,21 @@ import {
   Zap,
   CheckCircle,
   HelpCircle,
-  RefreshCw
+  RefreshCw,
+  LogOut,
+  HeartHandshake,
 } from "lucide-react";
+import CompanionCenter from "./CompanionCenter";
+import RecoveryCenter from "./RecoveryCenter";
+import { CompanionProfile } from "../types";
+
+export type SettingsTab = "api" | "telegram" | "companion" | "recovery";
 
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  activeTab: "api" | "telegram";
-  setActiveTab: (tab: "api" | "telegram") => void;
+  activeTab: SettingsTab;
+  setActiveTab: (tab: SettingsTab) => void;
   settingsKeyInput: string;
   setSettingsKeyInput: (val: string) => void;
   onSaveSettings: () => Promise<void> | void;
@@ -35,7 +42,20 @@ interface SettingsModalProps {
   triggerToast: (msg: string) => void;
   telegramAlertsEnabled: boolean;
   telegramAlertSlots: string[];
-  onSaveTelegramAlertSettings: (enabled: boolean, slots: string[]) => Promise<void> | void;
+  onSaveTelegramAlertSettings: (
+    enabled: boolean,
+    slots: string[],
+  ) => Promise<void> | void;
+
+  // Companion Props
+  companionProfile: CompanionProfile | null;
+  onUpdateCompanionProfile: (
+    updates: Partial<CompanionProfile>,
+  ) => Promise<void>;
+
+  // Recovery Props
+  userId: string | null;
+  onRecovered: () => void;
 }
 
 export default function SettingsModal({
@@ -56,10 +76,17 @@ export default function SettingsModal({
   triggerToast,
   telegramAlertsEnabled,
   telegramAlertSlots,
-  onSaveTelegramAlertSettings
+  onSaveTelegramAlertSettings,
+  companionProfile,
+  onUpdateCompanionProfile,
+  userId,
+  onRecovered,
 }: SettingsModalProps) {
-  const [localTgEnabled, setLocalTgEnabled] = React.useState(telegramAlertsEnabled);
-  const [localTgSlots, setLocalTgSlots] = React.useState<string[]>(telegramAlertSlots);
+  const [localTgEnabled, setLocalTgEnabled] = React.useState(
+    telegramAlertsEnabled,
+  );
+  const [localTgSlots, setLocalTgSlots] =
+    React.useState<string[]>(telegramAlertSlots);
 
   React.useEffect(() => {
     if (isOpen) {
@@ -72,324 +99,534 @@ export default function SettingsModal({
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 flex items-center justify-center p-4 z-[200] overflow-y-auto">
-        {/* Backdrop */}
+      <div className="fixed inset-0 flex items-center justify-center z-[200] overflow-hidden bg-zinc-50 dark:bg-[#0a0a0a]">
+        {/* Dialog Content - Full Screen Discord Style */}
         <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 bg-zinc-950/40 backdrop-blur-sm"
-          onClick={onClose}
-        />
-
-        {/* Dialog Content */}
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95, y: 16 }}
+          initial={{ opacity: 0, scale: 0.98, y: 10 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95, y: 16 }}
-          transition={{ type: "spring", stiffness: 450, damping: 35 }}
-          className="relative z-10 bg-white border border-zinc-200/80 rounded-2xl shadow-xl max-w-md w-full p-6 space-y-5 overflow-hidden"
+          exit={{ opacity: 0, scale: 0.98, y: 10 }}
+          transition={{ type: "spring", stiffness: 400, damping: 30 }}
+          className="relative z-10 bg-zinc-50 dark:bg-[#0a0a0a] w-full h-full max-w-full rounded-none flex flex-col md:flex-row overflow-hidden border-0"
         >
-          {/* Header */}
-          <div className="flex items-center justify-between border-b border-zinc-100 pb-3">
-            <h3 className="text-sm font-bold font-display text-zinc-900 flex items-center gap-2">
-              <Settings className="w-4 h-4 text-zinc-800 animate-spin-slow" />
-              Settings & Integrations
-            </h3>
-            <button
-              onClick={onClose}
-              className="p-1 hover:bg-zinc-100 rounded-lg text-zinc-400 hover:text-zinc-600 transition-all cursor-pointer"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
+          {/* Left Sidebar (Desktop) / Top Nav (Mobile) */}
+          <div className="w-full md:w-64 bg-zinc-100 dark:bg-[#121212] flex-shrink-0 border-b md:border-b-0 md:border-r border-zinc-200 dark:border-zinc-800 py-4 md:py-8 px-4 flex flex-row md:flex-col overflow-x-auto md:overflow-y-auto gap-2 md:gap-1">
+            <h2 className="hidden md:block px-3 text-[11px] font-black text-zinc-500 dark:text-zinc-400 uppercase tracking-widest mb-2 mt-2">
+              Configuration
+            </h2>
 
-          {/* Tab Bar */}
-          <div className="flex border-b border-zinc-100">
             <button
               onClick={() => setActiveTab("api")}
-              className={`pb-2.5 text-[11px] font-semibold tracking-wide uppercase border-b-2 px-3 transition-all cursor-pointer flex items-center gap-2 ${
+              className={`flex-shrink-0 flex items-center justify-center md:justify-start gap-3 px-4 md:px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors ${
                 activeTab === "api"
-                  ? "border-zinc-900 text-zinc-900 font-bold"
-                  : "border-transparent text-zinc-400 hover:text-zinc-600"
+                  ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-sm md:shadow-none"
+                  : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200/50 dark:hover:bg-zinc-800/50"
               }`}
             >
-              <Key className="w-3.5 h-3.5" />
-              Gemini Key
+              <Zap className="w-4 h-4" />
+              AI Engine
             </button>
             <button
               onClick={() => setActiveTab("telegram")}
-              className={`pb-2.5 text-[11px] font-semibold tracking-wide uppercase border-b-2 px-3 transition-all cursor-pointer flex items-center gap-2 ${
+              className={`flex-shrink-0 flex items-center justify-center md:justify-start gap-3 px-4 md:px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors ${
                 activeTab === "telegram"
-                  ? "border-zinc-900 text-zinc-900 font-bold"
-                  : "border-transparent text-zinc-400 hover:text-zinc-600"
+                  ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-sm md:shadow-none"
+                  : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200/50 dark:hover:bg-zinc-800/50"
               }`}
             >
-              <Bot className="w-3.5 h-3.5" />
-              Telegram Bot
+              <ExternalLink className="w-4 h-4" />
+              Integrations
+            </button>
+
+            <h2 className="hidden md:block px-3 text-[11px] font-black text-zinc-500 dark:text-zinc-400 uppercase tracking-widest mb-2 mt-4">
+              Behavior & OS
+            </h2>
+            <button
+              onClick={() => setActiveTab("companion")}
+              className={`flex-shrink-0 flex items-center justify-center md:justify-start gap-3 px-4 md:px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors ${
+                activeTab === "companion"
+                  ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-sm md:shadow-none"
+                  : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200/50 dark:hover:bg-zinc-800/50"
+              }`}
+            >
+              <Bot className="w-4 h-4" />
+              Coach Persona
+            </button>
+            <button
+              onClick={() => setActiveTab("recovery")}
+              className={`flex-shrink-0 flex items-center justify-center md:justify-start gap-3 px-4 md:px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors ${
+                activeTab === "recovery"
+                  ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-sm md:shadow-none"
+                  : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200/50 dark:hover:bg-zinc-800/50"
+              }`}
+            >
+              <HeartHandshake className="w-4 h-4" />
+              Recovery System
+            </button>
+
+            <div className="md:hidden flex-1" />
+            <button
+              onClick={onClose}
+              className="md:hidden flex-shrink-0 flex items-center justify-center p-2.5 rounded-lg text-zinc-500 hover:bg-zinc-200/50 dark:hover:bg-zinc-800/50"
+            >
+              <X className="w-5 h-5" />
             </button>
           </div>
 
-          {/* Tab Panels */}
-          <AnimatePresence mode="wait">
-            {activeTab === "api" ? (
-              <motion.div
-                key="api-panel"
-                initial={{ opacity: 0, x: -8 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 8 }}
-                transition={{ duration: 0.15 }}
-                className="space-y-4"
-              >
-                <p className="text-xs text-zinc-500 leading-relaxed">
-                  Provide your private Google Gemini API key to run client-side planner algorithms, syllabus analysis, real-time voice bridges, and interactive copilot queries.
-                </p>
+          {/* Right Content Area */}
+          <div className="flex-1 bg-white dark:bg-[#0a0a0a] relative flex flex-col h-full overflow-y-auto">
+            <button
+              onClick={onClose}
+              className="hidden md:flex absolute top-8 right-8 p-2 rounded-full border-2 border-zinc-300 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors flex-col items-center gap-1 group z-10"
+            >
+              <X className="w-5 h-5 group-hover:scale-110 transition-transform" />
+              <span className="text-[10px] font-bold uppercase tracking-wider">
+                Esc
+              </span>
+            </button>
 
-                <div className="p-3.5 bg-zinc-50 border border-zinc-200/80 rounded-xl space-y-1.5">
-                  <h4 className="text-[10px] font-bold text-zinc-800 uppercase tracking-wide font-mono flex items-center gap-1.5">
-                    <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
-                    Secure Local Storage
-                  </h4>
-                  <p className="text-[10px] text-zinc-500 leading-relaxed">
-                    Keys are locked to your authenticated session. They are encrypted within your cloud profile so you never have to re-enter them when changing devices.
-                  </p>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="block text-[9px] font-mono tracking-wider uppercase text-zinc-400 font-bold">
-                    Gemini API Key
-                  </label>
-                  <input
-                    type="password"
-                    value={settingsKeyInput}
-                    onChange={(e) => setSettingsKeyInput(e.target.value)}
-                    placeholder="AIzaSy..."
-                    className="input-primary font-mono"
-                  />
-                </div>
-
-                <div className="text-[10px] text-zinc-400 flex items-center justify-between">
-                  <span>Don't have an API key?</span>
-                  <a
-                    href="https://ai.google.dev/gemini-api"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-zinc-900 font-bold hover:underline inline-flex items-center gap-1"
+            <div className="max-w-2xl w-full mx-auto px-6 py-8 md:px-8 md:py-12 pb-24">
+              <AnimatePresence mode="wait">
+                {activeTab === "api" && (
+                  <motion.div
+                    key="api-panel"
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    transition={{ duration: 0.15 }}
+                    className="space-y-8"
                   >
-                    Get one for free at Google AI Studio
-                    <ExternalLink className="w-3 h-3" />
-                  </a>
-                </div>
-
-                <div className="flex justify-end gap-2 pt-3 border-t border-zinc-100">
-                  <button
-                    onClick={onClose}
-                    className="btn-secondary px-4 py-2"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={onSaveSettings}
-                    className="btn-primary px-5 py-2"
-                  >
-                    Save settings
-                  </button>
-                </div>
-              </motion.div>
-            ) : (
-              <motion.div
-                key="telegram-panel"
-                initial={{ opacity: 0, x: 8 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -8 }}
-                transition={{ duration: 0.15 }}
-                className="space-y-4"
-              >
-                {telegramChatId ? (
-                  /* Connected state */
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between p-4 bg-emerald-50 border border-emerald-150 rounded-2xl">
-                      <div className="space-y-1">
-                        <span className="text-[9px] font-bold tracking-wider text-emerald-850 uppercase flex items-center gap-1.5 font-mono">
-                          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                          Companion Linked
-                        </span>
-                        <p className="text-xs font-bold text-zinc-900 font-display">
-                          {telegramUsername ? `@${telegramUsername}` : `Chat ID: ${telegramChatId}`}
-                        </p>
-                      </div>
-                      <button
-                        onClick={onUnlinkTelegram}
-                        className="text-[10px] font-bold text-rose-600 hover:text-rose-800 hover:underline cursor-pointer transition-colors"
-                      >
-                        Disconnect Bot
-                      </button>
+                    <div>
+                      <h3 className="text-2xl font-bold font-display text-zinc-900 dark:text-zinc-100 mb-2">
+                        Gemini Configuration
+                      </h3>
+                      <p className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                        Provide your private Google Gemini API key to run
+                        client-side planner algorithms, syllabus analysis,
+                        real-time voice bridges, and interactive copilot
+                        queries.
+                      </p>
                     </div>
 
-                    <p className="text-xs text-zinc-500 leading-relaxed">
-                      Your Saarthi account is connected to your Telegram Bot! You will receive instant **Critical Rescue Alerts** on Telegram when deadlines compress, and can query commands or dictate voice notes.
-                    </p>
-
-                    <div className="space-y-4 pt-2 border-t border-zinc-100">
-                      <div className="flex items-center justify-between">
-                        <label className="text-[11px] font-bold text-zinc-800 uppercase tracking-wide">
-                          Critical Risk Push Alerts
-                        </label>
-                        <button
-                          onClick={() => setLocalTgEnabled(!localTgEnabled)}
-                          className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                            localTgEnabled ? 'bg-emerald-500' : 'bg-zinc-300'
-                          }`}
-                          aria-label="Toggle Critical Risk Push Alerts"
-                          role="switch"
-                          aria-checked={localTgEnabled}
-                        >
-                          <span
-                            className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
-                              localTgEnabled ? 'translate-x-4' : 'translate-x-1'
-                            } ${localTgEnabled ? 'ml-0.5' : ''}`}
-                          />
-                        </button>
-                      </div>
-
-                      <div className="space-y-2">
-                        <label className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">
-                          Daily Digest Slots (Max 3)
-                        </label>
-                        <p className="text-[10px] text-zinc-400 mb-2">Configure specific times to receive scheduled summary briefings of your active tasks and risks.</p>
-                        {localTgSlots.map((slot, idx) => (
-                          <div key={idx} className="flex items-center gap-2">
-                            <input
-                              type="time"
-                              value={slot}
-                              onChange={(e) => {
-                                const newSlots = [...localTgSlots];
-                                newSlots[idx] = e.target.value;
-                                setLocalTgSlots(newSlots);
-                              }}
-                              className="input-primary font-mono py-1.5 px-2 text-xs w-full max-w-[120px]"
-                            />
-                            <button
-                              onClick={() => {
-                                const newSlots = [...localTgSlots];
-                                newSlots.splice(idx, 1);
-                                setLocalTgSlots(newSlots);
-                              }}
-                              className="p-1.5 text-zinc-400 hover:text-rose-500 bg-zinc-100 rounded-lg transition-colors cursor-pointer"
-                              aria-label="Remove time slot"
-                            >
-                              <X className="w-3 h-3" />
-                            </button>
-                          </div>
-                        ))}
-                        {localTgSlots.length < 3 && (
-                          <button
-                            onClick={() => setLocalTgSlots([...localTgSlots, "09:00"])}
-                            className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 transition-colors flex items-center gap-1 mt-1 cursor-pointer"
-                          >
-                            + Add Time Slot
-                          </button>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="p-4 bg-zinc-50 border border-zinc-200/80 rounded-xl space-y-3">
-                      <h4 className="text-[10px] font-bold text-zinc-800 uppercase tracking-wide font-mono flex items-center gap-1.5">
-                        <Send className="w-3.5 h-3.5 text-zinc-600" />
-                        Trigger Live Sync Briefing
+                    <div className="p-5 bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800/80 rounded-xl space-y-2">
+                      <h4 className="text-sm font-bold text-zinc-800 dark:text-zinc-200 uppercase tracking-wide font-mono flex items-center gap-2">
+                        <CheckCircle className="w-4 h-4 text-emerald-600 dark:text-emerald-500" />
+                        Secure Local Storage
                       </h4>
-                      <p className="text-[10px] text-zinc-500 leading-relaxed">
-                        Test your companion bot immediately by sending a personalized morning briefing summarizing current tasks, risk zones, and recommended sprints.
-                      </p>
-                      <button
-                        onClick={onTriggerBriefing}
-                        className="btn-primary w-full py-2.5"
-                      >
-                        Send Morning Briefing
-                      </button>
-                    </div>
-
-                    <div className="flex justify-end gap-2 pt-2">
-                      <button
-                        onClick={onClose}
-                        className="btn-secondary px-4 py-2"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={() => {
-                          onSaveTelegramAlertSettings(localTgEnabled, localTgSlots);
-                          onClose();
-                        }}
-                        className="btn-primary px-5 py-2 text-xs"
-                      >
-                        Save Preferences
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  /* Unconnected state */
-                  <div className="space-y-4">
-                    <p className="text-xs text-zinc-500 leading-relaxed">
-                      Sync your syllabus planner with Telegram to unlock status queries, interactive milestones updating, and instant notification alerts.
-                    </p>
-
-                    <div className="space-y-2 text-[11px] text-zinc-600 leading-relaxed bg-zinc-50 p-4 rounded-xl border border-zinc-200/40">
-                      <p className="flex items-start gap-1.5">
-                        <span className="font-mono font-bold text-zinc-400">1.</span>
-                        <span>Start a conversation with your configured Telegram Bot.</span>
-                      </p>
-                      <p className="flex items-start gap-1.5">
-                        <span className="font-mono font-bold text-zinc-400">2.</span>
-                        <span>Send the command <code className="bg-white border border-zinc-200 px-1 py-0.5 rounded font-mono font-bold text-zinc-800">/start</code>.</span>
-                      </p>
-                      <p className="flex items-start gap-1.5">
-                        <span className="font-mono font-bold text-zinc-400">3.</span>
-                        <span>Tap below to generate a secure linking command.</span>
+                      <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                        Keys are locked to your authenticated session. They are
+                        encrypted within your cloud profile so you never have to
+                        re-enter them when changing devices.
                       </p>
                     </div>
 
-                    {telegramCode ? (
-                      <div className="p-4 bg-zinc-950 text-white rounded-xl flex flex-col items-center justify-center space-y-3.5 animate-fade-in border border-zinc-800">
-                        <span className="text-[9px] font-bold tracking-wider text-zinc-400 uppercase font-mono">Execute Linking Command</span>
-                        
-                        <div
-                          onClick={() => {
-                            navigator.clipboard.writeText(`/link ${telegramCode}`);
-                            triggerToast("Linking command copied!");
-                          }}
-                          className="font-mono text-base font-bold tracking-widest text-white bg-zinc-900 border border-zinc-800 px-4 py-2.5 rounded-lg shadow-inner cursor-pointer hover:bg-zinc-800 hover:scale-102 transition-all flex items-center gap-2"
-                          title="Click to copy whole link command"
+                    <div className="space-y-3">
+                      <label className="block text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                        Gemini API Key
+                      </label>
+                      <input
+                        type="password"
+                        value={settingsKeyInput}
+                        onChange={(e) => setSettingsKeyInput(e.target.value)}
+                        placeholder="AIzaSy..."
+                        className="w-full bg-zinc-100 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-800 rounded-lg px-4 py-3.5 font-mono text-sm focus:ring-2 focus:ring-indigo-500 transition-all outline-none"
+                      />
+                      <div className="text-xs text-zinc-500 dark:text-zinc-400 flex flex-col md:flex-row items-start md:items-center justify-between gap-2">
+                        <span>Don't have an API key?</span>
+                        <a
+                          href="https://ai.google.dev/gemini-api"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-indigo-600 dark:text-indigo-400 font-bold hover:underline inline-flex items-center gap-1"
                         >
-                          <code>/link {telegramCode}</code>
-                          <Clipboard className="w-3.5 h-3.5 text-zinc-400" />
+                          Get one for free at Google AI Studio
+                          <ExternalLink className="w-3 h-3" />
+                        </a>
+                      </div>
+                    </div>
+
+                    <div className="pt-6 mt-8 border-t border-zinc-200 dark:border-zinc-700/50 flex justify-end">
+                      <button
+                        onClick={onSaveSettings}
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 px-6 rounded-lg transition-colors cursor-pointer text-sm shadow-md"
+                      >
+                        Save API Key
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+
+                {activeTab === "telegram" && (
+                  <motion.div
+                    key="telegram-panel"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.15 }}
+                    className="space-y-8"
+                  >
+                    <div>
+                      <h3 className="text-2xl font-bold font-display text-zinc-900 dark:text-zinc-100 mb-2">
+                        Telegram Integration
+                      </h3>
+                      <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                        Connect your Saarthi account to a Telegram bot for
+                        mobile access, push alerts, and rapid voice note dumps.
+                      </p>
+                    </div>
+
+                    {telegramChatId ? (
+                      /* Connected state */
+                      <div className="space-y-8">
+                        <div className="flex flex-col md:flex-row items-start md:items-center justify-between p-5 bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-200 dark:border-emerald-800/30 rounded-2xl gap-4">
+                          <div className="space-y-1">
+                            <span className="text-xs font-bold tracking-wider text-emerald-800 dark:text-emerald-400 uppercase flex items-center gap-2 font-mono">
+                              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                              Companion Linked
+                            </span>
+                            <p className="text-lg font-bold text-zinc-900 dark:text-zinc-100 font-display break-all">
+                              {telegramUsername
+                                ? `@${telegramUsername}`
+                                : `Chat ID: ${telegramChatId}`}
+                            </p>
+                          </div>
+                          <button
+                            onClick={onUnlinkTelegram}
+                            className="w-full md:w-auto text-sm font-bold text-rose-600 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300 bg-rose-50 dark:bg-rose-900/20 px-4 py-2 rounded-lg cursor-pointer transition-colors"
+                          >
+                            Disconnect Bot
+                          </button>
                         </div>
 
-                        <p className="text-[10px] text-zinc-400 text-center leading-normal">
-                          Tap command to copy, then paste and send it directly to your companion bot.
-                        </p>
+                        <div className="space-y-6">
+                          <div>
+                            <h4 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 mb-4">
+                              Notification Settings
+                            </h4>
+                            <div className="flex flex-col md:flex-row items-start md:items-center justify-between p-4 bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700/50 rounded-xl gap-4">
+                              <div>
+                                <label className="text-sm font-bold text-zinc-900 dark:text-zinc-100 block mb-1">
+                                  Critical Risk Push Alerts
+                                </label>
+                                <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                                  Receive urgent telegram messages when
+                                  deadlines are near.
+                                </span>
+                              </div>
+                              <button
+                                onClick={() =>
+                                  setLocalTgEnabled(!localTgEnabled)
+                                }
+                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors flex-shrink-0 ${
+                                  localTgEnabled
+                                    ? "bg-indigo-500"
+                                    : "bg-zinc-300 dark:bg-zinc-600"
+                                }`}
+                              >
+                                <span
+                                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                    localTgEnabled
+                                      ? "translate-x-6"
+                                      : "translate-x-1"
+                                  }`}
+                                />
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="p-5 bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700/50 rounded-xl space-y-4">
+                            <div>
+                              <h4 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 mb-1">
+                                Focus Preferences (Quiet Hours)
+                              </h4>
+                              <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-4">
+                                Silence all ambient Telegram updates to safeguard rest or high-intensity focus.
+                              </p>
+                              <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                  <label className="block text-[10px] uppercase font-bold text-zinc-500 dark:text-zinc-400 mb-2 tracking-wider">
+                                    Silence From
+                                  </label>
+                                  <input
+                                    type="time"
+                                    defaultValue="22:00"
+                                    className="w-full text-sm p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all font-mono"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-[10px] uppercase font-bold text-zinc-500 dark:text-zinc-400 mb-2 tracking-wider">
+                                    Silence Until
+                                  </label>
+                                  <input
+                                    type="time"
+                                    defaultValue="08:00"
+                                    className="w-full text-sm p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all font-mono"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="p-5 bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700/50 rounded-xl space-y-4">
+                            <div>
+                              <label className="text-sm font-bold text-zinc-900 dark:text-zinc-100 block mb-1">
+                                Daily Digest Schedule
+                              </label>
+                              <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                                Configure up to 3 times to receive automated
+                                briefings of your active tasks and risks.
+                              </p>
+                            </div>
+
+                            <div className="space-y-3">
+                              {localTgSlots.map((slot, idx) => (
+                                <div
+                                  key={idx}
+                                  className="flex items-center gap-3"
+                                >
+                                  <input
+                                    type="time"
+                                    value={slot}
+                                    onChange={(e) => {
+                                      const newSlots = [...localTgSlots];
+                                      newSlots[idx] = e.target.value;
+                                      setLocalTgSlots(newSlots);
+                                    }}
+                                    className="bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-lg px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-indigo-500 outline-none text-zinc-900 dark:text-zinc-100"
+                                  />
+                                  <button
+                                    onClick={() => {
+                                      const newSlots = [...localTgSlots];
+                                      newSlots.splice(idx, 1);
+                                      setLocalTgSlots(newSlots);
+                                    }}
+                                    className="p-2 text-zinc-400 hover:text-rose-500 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 hover:border-rose-500 dark:hover:border-rose-500 rounded-lg transition-colors cursor-pointer"
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              ))}
+                              {localTgSlots.length < 3 && (
+                                <button
+                                  onClick={() =>
+                                    setLocalTgSlots([...localTgSlots, "10:00"])
+                                  }
+                                  className="text-sm font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 transition-colors flex items-center gap-1 cursor-pointer"
+                                >
+                                  + Add Time Slot
+                                </button>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex justify-end pt-2">
+                            <button
+                              onClick={() => {
+                                onSaveTelegramAlertSettings(
+                                  localTgEnabled,
+                                  localTgSlots,
+                                );
+                                triggerToast(
+                                  "Telegram notification settings saved.",
+                                );
+                              }}
+                              className="w-full md:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 px-6 rounded-lg transition-colors cursor-pointer text-sm shadow-md"
+                            >
+                              Save Preferences
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="p-5 bg-zinc-100 dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-700/50 rounded-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                          <div>
+                            <h4 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 mb-1 flex items-center gap-2">
+                              <Send className="w-4 h-4 text-zinc-500" />
+                              Trigger Live Sync Briefing
+                            </h4>
+                            <p className="text-xs text-zinc-600 dark:text-zinc-400">
+                              Send an immediate AI summary of your urgent tasks
+                              to Telegram right now.
+                            </p>
+                          </div>
+                          <button
+                            onClick={() => {
+                              onTriggerBriefing();
+                              triggerToast(
+                                "Manual briefing dispatched to Telegram.",
+                              );
+                            }}
+                            className="w-full md:w-auto bg-zinc-900 dark:bg-zinc-100 hover:bg-zinc-800 dark:hover:bg-zinc-200 text-white dark:text-zinc-900 font-bold py-2.5 px-5 rounded-lg text-sm cursor-pointer transition-colors"
+                          >
+                            Send Briefing
+                          </button>
+                        </div>
                       </div>
                     ) : (
-                      <button
-                        onClick={onGenerateLinkCode}
-                        disabled={isGeneratingTelegramCode}
-                        className="btn-primary w-full py-3"
-                      >
-                        {isGeneratingTelegramCode ? (
-                          <RefreshCw className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <>
-                            <Zap className="w-3.5 h-3.5" />
-                            <span>Generate Link Code</span>
-                          </>
-                        )}
-                      </button>
+                      /* Disconnected state */
+                      <div className="space-y-6">
+                        <div className="p-6 bg-zinc-50 dark:bg-zinc-800/30 border border-zinc-200 dark:border-zinc-700/50 rounded-xl space-y-6">
+                          {!telegramCode ? (
+                            <div className="text-center space-y-4">
+                              <div className="w-16 h-16 bg-indigo-100 dark:bg-indigo-900/30 rounded-full flex items-center justify-center mx-auto mb-2">
+                                <Bot className="w-8 h-8 text-indigo-600 dark:text-indigo-400" />
+                              </div>
+                              <div>
+                                <h4 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 mb-2">
+                                  Generate Link Code
+                                </h4>
+                                <p className="text-sm text-zinc-600 dark:text-zinc-400 max-w-sm mx-auto">
+                                  Generate a temporary pairing code. Send this
+                                  code to the Telegram bot to securely link your
+                                  account.
+                                </p>
+                              </div>
+                              <button
+                                onClick={onGenerateLinkCode}
+                                disabled={isGeneratingTelegramCode}
+                                className="w-full md:w-auto bg-indigo-600 hover:bg-indigo-700 disabled:bg-zinc-400 disabled:cursor-not-allowed text-white font-bold py-3 px-8 rounded-lg transition-colors cursor-pointer shadow-md inline-flex items-center justify-center gap-2"
+                              >
+                                {isGeneratingTelegramCode ? (
+                                  <RefreshCw className="w-5 h-5 animate-spin" />
+                                ) : (
+                                  <Key className="w-5 h-5" />
+                                )}
+                                {isGeneratingTelegramCode
+                                  ? "Generating..."
+                                  : "Generate Code"}
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="space-y-8">
+                              <div className="text-center">
+                                <h4 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 mb-2 uppercase tracking-widest font-mono">
+                                  Your Temporary Code
+                                </h4>
+                                <div className="inline-flex items-center gap-4 bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-6 py-4 rounded-xl">
+                                  <span className="text-3xl font-black tracking-[0.2em] font-mono text-zinc-900 dark:text-zinc-100">
+                                    {telegramCode}
+                                  </span>
+                                  <button
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(
+                                        telegramCode,
+                                      );
+                                      triggerToast("Code copied to clipboard!");
+                                    }}
+                                    className="p-2 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-lg text-zinc-500 transition-colors"
+                                    title="Copy Code"
+                                  >
+                                    <Clipboard className="w-5 h-5" />
+                                  </button>
+                                </div>
+                                <p className="text-xs text-rose-600 dark:text-rose-400 font-bold mt-3 animate-pulse">
+                                  Expires in 5 minutes
+                                </p>
+                              </div>
+
+                              <div className="space-y-4 bg-zinc-100 dark:bg-zinc-900 p-6 rounded-xl border border-zinc-200 dark:border-zinc-800">
+                                <h5 className="font-bold text-zinc-900 dark:text-zinc-100 text-center">
+                                  Next Steps:
+                                </h5>
+                                <ol className="max-w-sm mx-auto space-y-4">
+                                  <li className="flex gap-3 text-sm text-zinc-600 dark:text-zinc-400">
+                                    <span className="flex-shrink-0 w-6 h-6 rounded-full bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 font-bold flex items-center justify-center">
+                                      1
+                                    </span>
+                                    <span>
+                                      Open Telegram and search for{" "}
+                                      <strong className="text-zinc-900 dark:text-zinc-100">
+                                        @SaarthiAI_Bot
+                                      </strong>{" "}
+                                      (or click below).
+                                    </span>
+                                  </li>
+                                  <li className="flex gap-3 text-sm text-zinc-600 dark:text-zinc-400">
+                                    <span className="flex-shrink-0 w-6 h-6 rounded-full bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 font-bold flex items-center justify-center">
+                                      2
+                                    </span>
+                                    <span>
+                                      Send the command:{" "}
+                                      <code className="bg-white dark:bg-zinc-800 px-1.5 py-0.5 rounded text-zinc-900 dark:text-zinc-100 font-mono text-xs border border-zinc-200 dark:border-zinc-700">
+                                        /link {telegramCode}
+                                      </code>
+                                    </span>
+                                  </li>
+                                  <li className="flex gap-3 text-sm text-zinc-600 dark:text-zinc-400">
+                                    <span className="flex-shrink-0 w-6 h-6 rounded-full bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 font-bold flex items-center justify-center">
+                                      3
+                                    </span>
+                                    <span>
+                                      Wait for the confirmation message in
+                                      Telegram. You will see a success status
+                                      here immediately.
+                                    </span>
+                                  </li>
+                                </ol>
+                              </div>
+
+                              <div className="flex justify-center pt-2">
+                                <a
+                                  href="https://t.me/SaarthiAI_Bot" // Replace with your actual bot link if known
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="w-full md:w-auto bg-[#24A1DE] hover:bg-[#1E8CC0] text-white font-bold py-3 px-8 rounded-lg transition-colors inline-flex justify-center items-center gap-2 shadow-md"
+                                >
+                                  <ExternalLink className="w-5 h-5" />
+                                  Open Telegram Bot
+                                </a>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     )}
-                  </div>
+                  </motion.div>
                 )}
-              </motion.div>
-            )}
-          </AnimatePresence>
+                {activeTab === "companion" && (
+                  <motion.div
+                    key="companion-panel"
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    transition={{ duration: 0.15 }}
+                  >
+                    <CompanionCenter
+                      profile={companionProfile}
+                      onUpdateProfile={onUpdateCompanionProfile}
+                      inline={true}
+                    />
+                  </motion.div>
+                )}
+
+                {activeTab === "recovery" && (
+                  <motion.div
+                    key="recovery-panel"
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    transition={{ duration: 0.15 }}
+                  >
+                    {userId ? (
+                      <RecoveryCenter
+                        userId={userId}
+                        onRecovered={onRecovered}
+                        inline={true}
+                      />
+                    ) : (
+                      <div className="flex flex-col items-center justify-center py-20">
+                        <HeartHandshake className="w-12 h-12 text-zinc-300 dark:text-zinc-700 mb-4" />
+                        <h3 className="text-xl font-bold text-zinc-900 dark:text-zinc-100">
+                          Sign in required
+                        </h3>
+                        <p className="text-zinc-500 dark:text-zinc-400 mt-2">
+                          You must be logged in to use Recovery OS.
+                        </p>
+                      </div>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </div>
         </motion.div>
       </div>
     </AnimatePresence>

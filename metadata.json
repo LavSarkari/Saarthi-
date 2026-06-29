@@ -1,6 +1,6 @@
 {
   "name": "Saarthi",
-  "description": "An AI-powered execution companion that decomposes commitments, populates schedules, tracks deadline risk, and rescues you when you drift.",
+  "description": "An AI-powered adaptive execution companion that decomposes commitments, populates schedules, tracks deadline risk, and auto-adapts coaching styles to help you stay on track.",
   "requestFramePermissions": ["microphone"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

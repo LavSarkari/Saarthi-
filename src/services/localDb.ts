@@ -46,7 +46,10 @@ export function saveDb() {
 }
 
 class MockDoc {
-  constructor(private collectionName: string, private docId: string) {}
+  public id: string;
+  constructor(public collectionName: string, public docId: string) {
+    this.id = docId;
+  }
 
   async get() {
     const col = dbData[this.collectionName as keyof LocalDb] || {};
@@ -142,8 +145,8 @@ class MockQuery {
 class MockCollection {
   constructor(private collectionName: string) {}
 
-  doc(id: string) {
-    return new MockDoc(this.collectionName, id);
+  doc(id?: string) {
+    return new MockDoc(this.collectionName, id || Math.random().toString(36).substring(2, 15));
   }
 
   where(field: string, op: string, val: any) {
@@ -155,9 +158,60 @@ class MockCollection {
   }
 }
 
+class MockBatch {
+  private operations: Array<() => void> = [];
+  set(docRef: any, data: any, options?: any) {
+    this.operations.push(() => {
+      if (!dbData[docRef.collectionName as keyof LocalDb]) {
+        (dbData as any)[docRef.collectionName] = {};
+      }
+      const col = dbData[docRef.collectionName as keyof LocalDb];
+      if (options?.merge && col[docRef.docId]) {
+        col[docRef.docId] = { ...col[docRef.docId], ...data };
+      } else {
+        col[docRef.docId] = data;
+      }
+    });
+    return this;
+  }
+  update(docRef: any, data: any) {
+    this.operations.push(() => {
+      const col = dbData[docRef.collectionName as keyof LocalDb];
+      if (col && col[docRef.docId]) {
+        for (const [key, val] of Object.entries(data)) {
+          if (val === "DELETE_FIELD") {
+            delete col[docRef.docId][key];
+          } else {
+            col[docRef.docId][key] = val;
+          }
+        }
+      }
+    });
+    return this;
+  }
+  delete(docRef: any) {
+    this.operations.push(() => {
+      const col = dbData[docRef.collectionName as keyof LocalDb];
+      if (col && col[docRef.docId]) {
+        delete col[docRef.docId];
+      }
+    });
+    return this;
+  }
+  async commit() {
+    for (const op of this.operations) {
+      op();
+    }
+    saveDb();
+  }
+}
+
 export const mockFirestore = {
   collection(name: string) {
     return new MockCollection(name);
+  },
+  batch() {
+    return new MockBatch();
   }
 };
 

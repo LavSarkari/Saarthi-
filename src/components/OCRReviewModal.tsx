@@ -54,43 +54,43 @@ export default function OCRReviewModal({
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
           transition={{ type: "spring", stiffness: 400, damping: 30 }}
-          className="relative z-10 bg-white border border-zinc-200/80 rounded-2xl shadow-2xl max-w-3xl w-full max-h-[85vh] p-6 flex flex-col gap-5 overflow-hidden"
+          className="relative z-10 bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800/80 rounded-2xl shadow-2xl max-w-3xl w-full max-h-[85vh] p-6 flex flex-col gap-5 overflow-hidden"
         >
           {/* Header */}
-          <div className="flex items-start justify-between border-b border-zinc-100 pb-3">
+          <div className="flex items-start justify-between border-b border-zinc-100 dark:border-zinc-800 pb-3">
             <div>
-              <h3 className="text-sm font-bold font-display text-zinc-900 flex items-center gap-2">
+              <h3 className="text-sm font-bold font-display text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-indigo-500 animate-pulse" />
                 OCR Decomposed Commitments Review
               </h3>
-              <p className="text-[11px] text-zinc-500 mt-0.5">
+              <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">
                 Review, edit, and adjust extracted commitments before launching them into your Saarthi planner.
               </p>
             </div>
             <button
               onClick={onClose}
-              className="p-1.5 hover:bg-zinc-100 rounded-lg text-zinc-400 hover:text-zinc-600 transition-all cursor-pointer"
+              className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-all cursor-pointer"
             >
               <X className="w-4.5 h-4.5" />
             </button>
           </div>
 
           {/* Overall Confidence Banner */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between bg-zinc-50 rounded-2xl p-4 gap-4 border border-zinc-200/60">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl p-4 gap-4 border border-zinc-200/60 dark:border-zinc-700/50">
             <div>
-              <h4 className="text-xs font-bold text-zinc-800">Syllabus Text Accuracy Score</h4>
-              <p className="text-[10px] text-zinc-500 leading-normal">
+              <h4 className="text-xs font-bold text-zinc-800 dark:text-zinc-200">Syllabus Text Accuracy Score</h4>
+              <p className="text-[10px] text-zinc-500 dark:text-zinc-400 leading-normal">
                 Our vision engine verified course structures, module timelines, and deliverables.
               </p>
             </div>
             <div className="flex items-center gap-3">
               <div className="text-right">
-                <span className="text-[9px] font-mono uppercase tracking-wider text-zinc-400">Scan Accuracy</span>
-                <div className="text-lg font-bold font-mono text-indigo-600 leading-none mt-0.5">
+                <span className="text-[9px] font-mono uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Scan Accuracy</span>
+                <div className="text-lg font-bold font-mono text-indigo-600 dark:text-indigo-400 leading-none mt-0.5">
                   {ocrOverallConfidence}%
                 </div>
               </div>
-              <div className="w-20 bg-zinc-200 rounded-full h-2 overflow-hidden">
+              <div className="w-20 bg-zinc-200 dark:bg-zinc-700 rounded-full h-2 overflow-hidden">
                 <div
                   className={`h-full rounded-full ${
                     ocrOverallConfidence >= 85 ? "bg-emerald-500" : ocrOverallConfidence >= 60 ? "bg-amber-500" : "bg-rose-500"
@@ -106,15 +106,15 @@ export default function OCRReviewModal({
             {extractedCommitments.map((item, idx) => (
               <div
                 key={item.id}
-                className="border border-zinc-200/80 rounded-2xl p-5 bg-white shadow-xs hover:shadow-sm transition-all space-y-4 relative"
+                className="border border-zinc-200/80 dark:border-zinc-800 rounded-2xl p-5 bg-white dark:bg-zinc-900/50 shadow-xs hover:shadow-sm transition-all space-y-4 relative"
               >
                 {/* Individual Card Header */}
-                <div className="flex items-center justify-between pb-3 border-b border-zinc-100">
+                <div className="flex items-center justify-between pb-3 border-b border-zinc-100 dark:border-zinc-800">
                   <div className="flex items-center gap-2">
-                    <span className="bg-zinc-100 border border-zinc-200 text-zinc-700 text-[10px] font-mono py-0.5 px-2 rounded-md font-bold">
+                    <span className="bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 text-[10px] font-mono py-0.5 px-2 rounded-md font-bold">
                       DELIVERABLE #{idx + 1}
                     </span>
-                    <div className="flex items-center gap-1 bg-indigo-50 border border-indigo-100 text-indigo-700 text-[10px] font-bold py-0.5 px-2 rounded-md">
+                    <div className="flex items-center gap-1 bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/30 text-indigo-700 dark:text-indigo-400 text-[10px] font-bold py-0.5 px-2 rounded-md">
                       <span>Vision Confidence:</span>
                       <span>{item.confidence}%</span>
                     </div>
@@ -161,7 +161,7 @@ export default function OCRReviewModal({
                 <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
                   {/* Description */}
                   <div className="md:col-span-8 space-y-1">
-                    <label className="block text-[10px] font-mono uppercase text-zinc-400 font-bold">
+                    <label className="block text-[10px] font-mono uppercase text-zinc-400 dark:text-zinc-500 font-bold">
                       Requirements & Syllabus notes
                     </label>
                     <textarea
@@ -175,7 +175,7 @@ export default function OCRReviewModal({
 
                   {/* Estimated effort */}
                   <div className="md:col-span-4 space-y-1">
-                    <label className="block text-[10px] font-mono uppercase text-zinc-400 font-bold">
+                    <label className="block text-[10px] font-mono uppercase text-zinc-400 dark:text-zinc-500 font-bold">
                       Estimated Effort (Minutes)
                     </label>
                     <input
@@ -192,9 +192,9 @@ export default function OCRReviewModal({
             ))}
 
             {extractedCommitments.length === 0 && (
-              <div className="text-center py-12 bg-zinc-50 rounded-2xl border border-zinc-200/50 space-y-2">
-                <p className="text-zinc-500 font-bold text-xs">No deliverables in review queue</p>
-                <p className="text-[11px] text-zinc-400 leading-normal">
+              <div className="text-center py-12 bg-zinc-50 dark:bg-zinc-800/30 rounded-2xl border border-zinc-200/50 dark:border-zinc-700/50 space-y-2">
+                <p className="text-zinc-500 dark:text-zinc-400 font-bold text-xs">No deliverables in review queue</p>
+                <p className="text-[11px] text-zinc-400 dark:text-zinc-500 leading-normal">
                   Exit this dialogue and scan another syllabus photo to populate tasks.
                 </p>
               </div>
@@ -202,7 +202,7 @@ export default function OCRReviewModal({
           </div>
 
           {/* Footer actions */}
-          <div className="flex items-center justify-between pt-4 border-t border-zinc-100">
+          <div className="flex items-center justify-between pt-4 border-t border-zinc-100 dark:border-zinc-800">
             <button
               onClick={onClose}
               className="btn-secondary px-4 py-2"

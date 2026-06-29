@@ -2,6 +2,7 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { extractAndParseJson } from "./jsonUtils.js";
 import { AppError } from "./errorHandler.js";
 import { generateContentWithRetryAndFallback } from "./geminiCall.js";
+import { Task } from "../types.js";
 
 export interface SubtaskPlan {
   title: string;
@@ -47,7 +48,7 @@ export class PlannerService {
   /**
    * Decomposes any qualitative commitment prompt into a structured, action-oriented plan of subtasks.
    */
-  async generateTaskPlan(commitment: string, aiClient: GoogleGenAI): Promise<TaskPlan> {
+  async generateTaskPlan(commitment: string, aiClient: GoogleGenAI, aiContext?: string): Promise<TaskPlan> {
     if (!commitment || commitment.trim().length === 0) {
       throw new AppError("Commitment is empty. Cannot plan task.", "BAD_REQUEST", 400);
     }
@@ -65,11 +66,15 @@ export class PlannerService {
     };
 
     try {
+      let instructions = "You are Saarthi, a highly strategic task planner. Decompose the user's task or academic/professional commitment into clear, action-oriented, distinct subtasks. Underestimate nothing: be realistic and time-box each subtask. Suggest 3 to 6 subtasks. Return the response strictly as a JSON object that matches the provided schema.";
+      if (aiContext) {
+         instructions += `\n\nUSER BEHAVIORAL INTELLIGENCE CONTEXT:\n${aiContext}\nUse this context to adjust your time estimates, chunk sizes, and risk factors appropriately based on the user's historical performance.`;
+      }
       const response = await generateContentWithRetryAndFallback(aiClient, {
         model: "gemini-3.1-flash-lite",
         contents: commitment,
         config: {
-          systemInstruction: "You are Saarthi, a highly strategic task planner. Decompose the user's task or academic/professional commitment into clear, action-oriented, distinct subtasks. Underestimate nothing: be realistic and time-box each subtask. Suggest 3 to 6 subtasks. Return the response strictly as a JSON object that matches the provided schema.",
+          systemInstruction: instructions,
           responseMimeType: "application/json",
           responseSchema: {
             type: Type.OBJECT,
@@ -152,6 +157,147 @@ export class PlannerService {
     } catch (error) {
       console.error("PlannerService.generateTaskPlan failed", error);
       return defaultFallback;
+    }
+  }
+
+  async generateAdaptiveSchedule(
+    userId: string,
+    tasks: Task[],
+    strategy: string,
+    maxFocusDuration: number,
+    preferredStartHour: number,
+    preferredEndHour: number,
+    aiClient: GoogleGenAI
+  ): Promise<{ updatedTasks: Task[], insights: string[] }> {
+    // If no tasks, nothing to schedule
+    if (!tasks || tasks.length === 0) return { updatedTasks: [], insights: [] };
+
+    const activeTasks = tasks.filter(t => t.subtasks.some(s => !s.done));
+    if (activeTasks.length === 0) return { updatedTasks: tasks, insights: [] };
+
+    // Format input for AI
+    const tasksInput = activeTasks.map(t => ({
+      id: t.id,
+      title: t.title,
+      deadline: t.deadline,
+      subtasks: t.subtasks.filter(s => !s.done).map(s => ({
+        id: s.id,
+        title: s.title,
+        estimatedMinutes: s.estimatedMinutes
+      }))
+    }));
+
+    try {
+      const prompt = `You are Saarthi's Adaptive Scheduling Engine.
+Your goal is to take a list of active tasks and their pending subtasks, and dynamically assign them 'scheduledStart' and 'scheduledEnd' ISO dates based on the user's constraints.
+Also, if a subtask's estimated time exceeds the max focus duration (${maxFocusDuration} mins), split it into multiple smaller subtasks!
+
+Constraints:
+- Strategy: ${strategy} (optimize the schedule for this strategy)
+- Preferred Hours: ${preferredStartHour}:00 to ${preferredEndHour}:00
+- Max Focus Duration per block: ${maxFocusDuration} minutes
+- Start scheduling from: ${new Date().toISOString()}
+
+Tasks Input:
+${JSON.stringify(tasksInput, null, 2)}
+
+Return a strict JSON object matching this schema:
+{
+  "updatedTasks": [
+    {
+      "id": "task-id",
+      "subtasks": [
+        {
+          "id": "subtask-id (keep original if not split, or create new id if split)",
+          "title": "Subtask title",
+          "estimatedMinutes": 30,
+          "scheduledStart": "ISO string",
+          "scheduledEnd": "ISO string",
+          "adaptiveExplanation": "Short string explaining why it was placed here or split"
+        }
+      ]
+    }
+  ],
+  "insights": ["Insight 1", "Insight 2"]
+}
+`;
+
+      const response = await generateContentWithRetryAndFallback(aiClient, {
+        model: "gemini-3.1-flash-lite",
+        contents: prompt,
+        config: {
+          systemInstruction: "You are an intelligent adaptive scheduling engine. Follow constraints strictly and return only JSON matching the schema.",
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              updatedTasks: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    id: { type: Type.STRING },
+                    subtasks: {
+                      type: Type.ARRAY,
+                      items: {
+                        type: Type.OBJECT,
+                        properties: {
+                          id: { type: Type.STRING },
+                          title: { type: Type.STRING },
+                          estimatedMinutes: { type: Type.INTEGER },
+                          scheduledStart: { type: Type.STRING },
+                          scheduledEnd: { type: Type.STRING },
+                          adaptiveExplanation: { type: Type.STRING }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              insights: {
+                type: Type.ARRAY,
+                items: { type: Type.STRING }
+              }
+            }
+          }
+        }
+      });
+
+      let parsed;
+      try {
+        parsed = JSON.parse(response || "{}");
+      } catch (e) {
+        throw new Error("Failed to parse adaptive schedule response");
+      }
+
+      if (!parsed.updatedTasks) throw new Error("Invalid response schema");
+
+      // Merge scheduled updates back into the original tasks
+      const mergedTasks = tasks.map(t => {
+        const update = parsed.updatedTasks.find((u: any) => u.id === t.id);
+        if (update) {
+          // preserve done subtasks
+          const doneSubtasks = t.subtasks.filter(s => s.done);
+          // map updated active subtasks
+          const newActiveSubtasks = update.subtasks.map((us: any, idx: number) => ({
+            id: us.id || `split_${Date.now()}_${idx}`,
+            title: us.title,
+            estimatedMinutes: us.estimatedMinutes,
+            done: false,
+            order: idx,
+            scheduledStart: us.scheduledStart,
+            scheduledEnd: us.scheduledEnd,
+            adaptiveExplanation: us.adaptiveExplanation
+          }));
+          return { ...t, subtasks: [...doneSubtasks, ...newActiveSubtasks] };
+        }
+        return t;
+      });
+
+      return { updatedTasks: mergedTasks, insights: parsed.insights || [] };
+    } catch (e) {
+      console.error("Adaptive scheduling failed", e);
+      return { updatedTasks: tasks, insights: ["Schedule fallback used due to optimization error."] };
     }
   }
 

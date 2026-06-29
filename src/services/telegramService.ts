@@ -3,8 +3,11 @@ import fs from "fs";
 import path from "path";
 import { GoogleGenAI, Type } from "@google/genai";
 import { computeRiskScore, getHoursRemaining } from "../lib/riskEngine.js";
-import { Task, Subtask } from "../types.js";
+import { Task, Subtask, ActivationSession } from "../types.js";
 import { generateContentWithRetryAndFallback } from "./geminiCall.js";
+import { activationService } from "./activationService.js";
+import { engagementService } from "./engagementService.js";
+import { behavioralIntelligenceService } from "./behavioralIntelligenceService.js";
 
 // Initialize local DB mock (fully compatible with Firestore interface)
 const dbAdmin = mockFirestore as any;
@@ -368,6 +371,24 @@ export class TelegramService {
     // Check if the user is linked
     const userId = await this.getUserByChatId(chatId);
 
+    if (userId) {
+      try {
+        await behavioralIntelligenceService.trackEvent({
+          userId,
+          eventType: "TELEGRAM_REPLY",
+          confidence: 100
+        });
+      } catch (e) {
+        console.error("Failed to track TELEGRAM_REPLY", e);
+      }
+    }
+
+    if (userId) {
+      await engagementService.recordInteraction(userId, "message").catch(err => {
+        console.error("Failed to record Telegram message interaction:", err);
+      });
+    }
+
     
     // 1. Check if the text matches a persistent Reply Keyboard button
     if (userId) {
@@ -447,14 +468,14 @@ export class TelegramService {
     } else {
       // 3.5 Intercept "I'm stuck" / "help" / "overwhelmed"
       const lowerText = text.toLowerCase();
-      if (lowerText.includes("stuck") || lowerText.includes("overwhelmed") || lowerText.includes("help") || lowerText.includes("tired")) {
-        const inline_keyboard = [
-          [{ text: "🐞 Bug", callback_data: "tasks_list" }],
-          [{ text: "🧠 Can't figure it out", callback_data: "tasks_list" }],
-          [{ text: "😵 Overwhelmed", callback_data: "menu_recovery" }],
-          [{ text: "📚 Don't know what to do", callback_data: "tasks_list" }]
-        ];
-        await this.sendMessage(chatId, `💛 Happens to everyone.\n\nWhere are you stuck?`, { reply_markup: { inline_keyboard } });
+      
+      if (lowerText.includes("behind") || lowerText.includes("failed") || lowerText.includes("messed up") || lowerText.includes("ruined my week") || lowerText.includes("missed everything")) {
+        await this.handleRecovery(chatId, userId);
+        return;
+      }
+      
+      if (lowerText.includes("stuck") || lowerText.includes("overwhelmed") || lowerText.includes("tired") || lowerText.includes("can't do this") || lowerText.includes("don't know where to start")) {
+        await this.handleActivationRequest(chatId, userId);
         return;
       }
       await this.handleGenericMessage(chatId, userId, text);
@@ -489,6 +510,10 @@ export class TelegramService {
       return;
     }
 
+    await engagementService.recordInteraction(userId, "button_press").catch(err => {
+      console.error("Failed to record Telegram button press interaction:", err);
+    });
+
     try {
       if (data === "tasks_list") {
         await this.answerCallbackQuery(callbackId);
@@ -511,6 +536,22 @@ export class TelegramService {
         } else {
           await this.showHelpTopic(chatId, topic, messageId);
         }
+      } else if (data.startsWith("activation_start:")) {
+        const sessionId = data.split(":")[1];
+        await this.answerCallbackQuery(callbackId);
+        await this.handleActivationCallback(chatId, userId, "start", sessionId, messageId);
+      } else if (data.startsWith("activation_shrink:")) {
+        const sessionId = data.split(":")[1];
+        await this.answerCallbackQuery(callbackId);
+        await this.handleActivationCallback(chatId, userId, "shrink", sessionId, messageId);
+      } else if (data.startsWith("activation_complete:")) {
+        const sessionId = data.split(":")[1];
+        await this.answerCallbackQuery(callbackId);
+        await this.handleActivationCallback(chatId, userId, "complete", sessionId, messageId);
+      } else if (data.startsWith("activation_next:")) {
+        const targetTaskId = data.split(":")[1];
+        await this.answerCallbackQuery(callbackId);
+        await this.handleActivationRequest(chatId, userId, targetTaskId);
       } else if (data === "help_index") {
         await this.answerCallbackQuery(callbackId);
         await this.handleHelp(chatId, userId, messageId);
@@ -549,8 +590,37 @@ export class TelegramService {
       } else if (data.startsWith("toggle_setting:")) {
         const field = data.split(":")[1];
         await this.toggleUserSetting(chatId, userId, field, callbackId, messageId);
+      } else if (data.startsWith("undo_tasks:")) {
+        const taskIdsStr = data.split(":")[1];
+        if (taskIdsStr) {
+          const taskIds = taskIdsStr.split(",");
+          const batch = dbAdmin.batch();
+          for (const tid of taskIds) {
+            batch.delete(dbAdmin.collection("tasks").doc(tid));
+          }
+          await batch.commit();
+          await this.answerCallbackQuery(callbackId, "Tasks undone successfully.");
+          await this.editMessageText(chatId, messageId, "↩️ Tasks creation undone. They have been deleted.");
+        } else {
+          await this.answerCallbackQuery(callbackId, "Nothing to undo.");
+        }
       } else if (data === "config_notifications" || data === "config_lang") {
         await this.answerCallbackQuery(callbackId, "Please use the web dashboard to configure this setting.");
+      } else if (data.startsWith("recover_accept_")) {
+        const planId = data.replace("recover_accept_", "");
+        await this.answerCallbackQuery(callbackId, "Rebuilding your week...");
+        await this.editMessageText(chatId, messageId, "⏳ Executing recovery sequence. Adjusting commitments in the database...");
+        
+        try {
+          const { recoveryService } = await import('./recoveryService.js');
+          await recoveryService.executeRecoveryPlan(userId, planId);
+          await this.editMessageText(chatId, messageId, "✅ **Week Rebuilt Successfully.**\n\nYour commitments have been adjusted, risk scores updated, and your confidence is restored. Let's move forward one step at a time.");
+        } catch (error: any) {
+          await this.editMessageText(chatId, messageId, `⚠️ Failed to execute recovery plan: ${error.message}`);
+        }
+      } else if (data === "recover_cancel") {
+        await this.answerCallbackQuery(callbackId, "Recovery cancelled.");
+        await this.editMessageText(chatId, messageId, "❌ Recovery cancelled. Your original commitments have not been changed.");
       } else {
         await this.answerCallbackQuery(callbackId, "Unknown callback action.");
       }
@@ -987,61 +1057,8 @@ export class TelegramService {
    * On-demand AI Recovery Plan compilation
    */
   private async executeTaskRecovery(chatId: number, userId: string, taskId: string, editMessageId: number) {
-    try {
-      await this.editMessageText(chatId, editMessageId, "🛟 _Generating recovery strategy..._");
-      await this.sendChatAction(chatId, "typing");
-
-      const docRef = dbAdmin.collection("tasks").doc(taskId);
-      const docSnap = await docRef.get();
-      if (!docSnap.exists) return;
-
-      const task = { id: docSnap.id, ...docSnap.data() } as Task;
-
-      const hoursRemaining = getHoursRemaining(task.deadline);
-      const subtasksLeft = task.subtasks.filter((s) => !s.done);
-      const subtasksLeftNames = subtasksLeft.map((s) => s.title);
-
-      const { recoveryService } = await import("./recoveryService.js");
-      const plan = await recoveryService.generateRecoveryPlan(
-        task.title,
-        task.description,
-        hoursRemaining,
-        task.totalEffortMinutes,
-        subtasksLeft.length,
-        subtasksLeftNames,
-        ai
-      );
-
-      const updatedPlan = {
-        isRecovered: false,
-        situationSummary: plan.situationSummary,
-        messageToUser: plan.messageToUser,
-        advice: plan.advice,
-      };
-
-      await docRef.update({
-        recoveryPlan: updatedPlan,
-      });
-
-      let text = `🛟 *Recovery Plan: ${task.title}*\n\n`;
-      text += `_${plan.situationSummary}_\n\n`;
-      text += `*${plan.messageToUser}*\n\n`;
-      text += `✂️ *Tactical Intervention Advice:*\n${plan.advice}\n\n`;
-      text += `📈 *Expected Improvement:* +25% Confidence recovery upon applying these descaling guidelines.\n`;
-      text += `━━━━━━━━━━━━━━━━━━━━━━━━━━`;
-
-      const inline_keyboard = [
-        [{ text: "✅ Apply Recovery Plan", callback_data: `apply_recovery_act:${task.id}` }],
-        [{ text: "⏰ Snooze Deadline Instead", callback_data: `task_snooze:${task.id}` }],
-        [{ text: "⬅️ Back to Task Card", callback_data: `task_details:${task.id}` }]
-      ];
-
-      await this.editMessageText(chatId, editMessageId, text, {
-        reply_markup: { inline_keyboard }
-      });
-    } catch (err: any) {
-      await this.editMessageText(chatId, editMessageId, `⚠️ Failed to formulate recovery plan: ${err.message}`);
-    }
+    // We now use the global full-week Recovery OS instead of task-specific recovery
+    await this.handleRecovery(chatId, userId, editMessageId);
   }
 
   /**
@@ -1126,45 +1143,48 @@ export class TelegramService {
    */
   async handleRecovery(chatId: number, userId: string, editMessageId?: number) {
     try {
-      const tasksSnap = await dbAdmin.collection("tasks").where("userId", "==", userId).get();
-      const tasks = tasksSnap.docs.map((d: any) => ({ id: d.id, ...d.data() } as Task));
-      
-      const highRiskTasks = tasks.filter((t) => {
-        const risk = computeRiskScore(t);
-        return (risk.zone === "critical" || risk.zone === "watch") && t.subtasks.some((s) => !s.done);
-      });
-
-      if (highRiskTasks.length === 0) {
-        const clearMsg = `🛡️ *Saarthi Recovery Center* 🛡️\n\n*All systems stable!* None of your active commitments are triggering risk flags. You're fully on-track to crush all deadlines. Continue your progress!`;
-        if (editMessageId) {
-          await this.editMessageText(chatId, editMessageId, clearMsg);
-        } else {
-          await this.sendMessage(chatId, clearMsg);
-        }
-        return;
+      if (editMessageId) {
+        await this.editMessageText(chatId, editMessageId, "💜 _Analyzing your week and building a safe recovery plan..._");
+      } else {
+        await this.sendChatAction(chatId, "typing");
+        const loadingMsg = await this.sendMessage(chatId, "💜 _Analyzing your week and building a safe recovery plan..._");
+        editMessageId = loadingMsg?.message_id;
       }
 
-      let text = `🛟 *Saarthi Recovery Center* 🛟\n\n`;
-      text += `When execution velocity falls, Saarthi crafts dynamic survival roadmaps to protect your milestones.\n\n`;
-      text += `Select a high-risk commitment below to review or formulate its tactical rescue plan:`;
+      const aiClient = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+      const { recoveryService } = await import('./recoveryService.js');
+      const plan = await recoveryService.generateRecoveryPlan(userId, "balanced", aiClient);
 
-      const inline_keyboard: any[][] = [];
-      highRiskTasks.forEach((t) => {
-        const risk = computeRiskScore(t);
-        inline_keyboard.push([
-          { text: `🚨 Rescue: ${t.title} (${Math.round(risk.completionConfidence)}%)`, callback_data: `task_recovery:${t.id}` }
-        ]);
-      });
+      let text = `💜\n*Looks like life became more complicated than expected.*\n_${plan.situationSummary.message}_\n\n`;
+      text += `*Recovery Plan Generated*\n━━━━━━━━━━━━━━\n`;
+      text += `Rescued: ${plan.expectedRecovery.timeRecoveredHours}h\n`;
+      text += `Adjusted: ${plan.suggestedTradeoffs.length} commitments\n`;
+      text += `Confidence Restored: ${plan.expectedRecovery.confidenceBefore}% → ${plan.expectedRecovery.confidenceAfter}%\n━━━━━━━━━━━━━━\n\n`;
+
+      if (plan.suggestedTradeoffs.length > 0) {
+        text += `*Key Tradeoffs:*\n`;
+        plan.suggestedTradeoffs.forEach(t => {
+          text += `• ${t.originalTitle}: ${t.explanation}\n`;
+        });
+      }
+
+      const inline_keyboard = [
+        [{ text: "✅ Accept & Rebuild Week", callback_data: `recover_accept_${plan.id}` }],
+        [{ text: "❌ Cancel", callback_data: "recover_cancel" }]
+      ];
 
       if (editMessageId) {
-        await this.editMessageText(chatId, editMessageId, text, {
-          reply_markup: { inline_keyboard }
-        });
+        await this.editMessageText(chatId, editMessageId, text, { reply_markup: { inline_keyboard } });
       } else {
         await this.sendMessage(chatId, text, { reply_markup: { inline_keyboard } });
       }
     } catch (error: any) {
       console.error("Error in recovery list handler:", error);
+      if (editMessageId) {
+        await this.editMessageText(chatId, editMessageId, `⚠️ Failed to formulate recovery plan: ${error.message}`);
+      } else {
+        await this.sendMessage(chatId, `⚠️ Failed to formulate recovery plan: ${error.message}`);
+      }
     }
   }
 
@@ -1534,17 +1554,49 @@ export class TelegramService {
    * Command: /briefing (Generate AI-powered morning summary)
    */
   async handleBriefing(chatId: number, userId: string) {
+    let loadingMsgId: any = undefined;
     try {
       await this.sendChatAction(chatId, "typing");
-      const loadingMsg = await this.sendMessage(chatId, "☕ _Preparing morning briefing..._");
-      const loadingMsgId = loadingMsg?.message_id;
+      const loadingMsg = await this.sendMessage(chatId, "☕ _Preparing your briefing..._");
+      loadingMsgId = loadingMsg?.message_id;
+
+      let timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      try {
+        const userSettingsSnap = await dbAdmin.collection("userSettings").doc(userId).get();
+        if (userSettingsSnap.exists) {
+          const data = userSettingsSnap.data();
+          if (data?.timezone) {
+            timezone = data.timezone;
+          }
+        }
+      } catch (err) {
+        console.warn("Could not fetch user timezone", err);
+      }
+
+      let greeting = "☀️ *Good morning!*";
+      let greetingLine = "Here's today's plan.";
+      try {
+        const timeFormatter = new Intl.DateTimeFormat("en-US", { timeZone: timezone, hour: "numeric", hour12: false });
+        const currentHour = parseInt(timeFormatter.format(new Date()), 10);
+        if (currentHour >= 12 && currentHour < 17) {
+          greeting = "👋 *Good afternoon!*";
+          greetingLine = "Here's the plan for the rest of the day.";
+        } else if (currentHour >= 17 || currentHour < 4) {
+          greeting = "🌙 *Good evening!*";
+          greetingLine = "Here's your current status.";
+        }
+      } catch (err) {
+        console.error("Timezone greeting error", err);
+      }
 
       const tasksSnap = await dbAdmin.collection("tasks").where("userId", "==", userId).get();
       const tasks = tasksSnap.docs.map((d) => ({ id: d.id, ...d.data() } as Task));
       const activeTasks = tasks.filter((t) => t.subtasks.some((s) => !s.done));
 
       if (activeTasks.length === 0) {
-        const msg = "☕ *Good Morning!* Your execution slate is pristine.\n\nEnjoy your day or plan a new goal."; if (loadingMsgId) await this.editMessageText(chatId, loadingMsgId, msg); else await this.sendMessage(chatId, msg);
+        const msg = `${greeting}\n\nYour execution slate is pristine.\n\nEnjoy your time or plan a new goal.`; 
+        if (loadingMsgId) await this.editMessageText(chatId, loadingMsgId, msg); 
+        else await this.sendMessage(chatId, msg);
         return;
       }
 
@@ -1563,24 +1615,37 @@ export class TelegramService {
       
       const criticalCount = activeTasks.filter(t => computeRiskScore(t).zone === "critical").length;
 
-      let text = `☀️ *Good morning!*\n\nHere's today's plan.\n\n━━━━━━━━━━━━━━\n\n`;
-      text += `📋 *Tasks*\n${activeTasks.length}\n\n`;
-      text += `⏰ *Focus Time*\n${hours}h ${minutes}m\n\n`;
-      text += `📈 *Execution Health*\n${avgConfidence}%\n\n`;
-      if (criticalCount > 0) {
-        text += `⚠️ *Recovery Needed*\n${criticalCount} task${criticalCount > 1 ? 's' : ''}\n\n`;
-      }
-      text += `━━━━━━━━━━━━━━\n\nReady?`;
+      let text = `${greeting}\n_${greetingLine}_\n\n━━━━━━━━━━━━━━\n\n`;
+      text += `🎯 *Active Tasks:* ${activeTasks.length}\n`;
+      text += `⏳ *Est. Focus Time:* ${hours}h ${minutes}m\n`;
       
+      let healthEmoji = "🟢";
+      if (avgConfidence < 80) healthEmoji = "🟡";
+      if (avgConfidence < 50) healthEmoji = "🔴";
+      text += `🧠 *Execution Health:* ${healthEmoji} ${avgConfidence}%\n`;
+      
+      if (criticalCount > 0) {
+        text += `\n⚠️ *Action Required:* ${criticalCount} task${criticalCount > 1 ? 's' : ''} in critical zone\n`;
+      }
+      
+      text += `\n━━━━━━━━━━━━━━\n\n*Ready to begin?*`;
+
       const inline_keyboard = [
-        [{ text: "▶️ Start Focus", callback_data: "tasks_list" }],
-        [{ text: "📅 Today's Plan", callback_data: "menu_today" }],
-        [{ text: "⏰ Reschedule", callback_data: "menu_today" }]
+        [{ text: "▶️ Start Focus", callback_data: "tasks_list" }, { text: "📅 Plan", callback_data: "menu_today" }],
+        [{ text: "⏰ Schedule", callback_data: "menu_today" }, { text: "⚙️ Settings", callback_data: "menu_settings" }]
       ];
 
-      await this.sendMessage(chatId, text, { reply_markup: { inline_keyboard } });
+      if (loadingMsgId) {
+        await this.editMessageText(chatId, loadingMsgId, text, { reply_markup: { inline_keyboard } });
+      } else {
+        await this.sendMessage(chatId, text, { reply_markup: { inline_keyboard } });
+      }
     } catch (error: any) {
-      await this.sendMessage(chatId, `⚠️ Failed to compile morning briefing: ${error.message}`);
+      if (typeof loadingMsgId !== "undefined") {
+        await this.editMessageText(chatId, loadingMsgId, `⚠️ Failed to compile morning briefing: ${error.message}`);
+      } else {
+        await this.sendMessage(chatId, `⚠️ Failed to compile morning briefing: ${error.message}`);
+      }
     }
   }
 
@@ -1596,11 +1661,24 @@ export class TelegramService {
       const chatId = data.telegramChatId;
       if (!chatId) return;
       if (data.telegramAlertsEnabled === false) return;
+      
+      const companion = data.companionProfile?.activeCompanion || "guardian";
 
       const risk = computeRiskScore(task);
       
       if (risk.zone === "critical") {
-        const text = `⚠️ *Heads up.*\n\nYour *${task.title}* is slipping behind schedule.\n\nNothing to panic about.\nI already have a recovery plan ready.`;
+        let text = `⚠️ *Heads up.*\n\nYour *${task.title}* is slipping behind schedule.\n\nNothing to panic about.\nI already have a recovery plan ready.`;
+        
+        if (companion === "commander") {
+          text = `🛑 *Critical Alert.*\n\n*${task.title}* is off-track. We cannot afford this delay.\nExecute the recovery plan immediately.`;
+        } else if (companion === "strategist") {
+          text = `📊 *Risk Threshold Exceeded.*\n\n*${task.title}* has dropped below optimal completion probability.\nI have computed a strategic recovery plan.`;
+        } else if (companion === "challenger") {
+          text = `⚡ *Time to step up!*\n\nYour *${task.title}* is lagging. I know you can beat this deadline. Let's fix it right now!`;
+        } else if (companion === "mentor") {
+          text = `🌱 *Check-in.*\n\nIt looks like *${task.title}* is getting difficult. That's completely okay.\nLet's look at the recovery plan to get back on track.`;
+        }
+
         const inline_keyboard = [
             [{ text: "🛟 View Recovery", callback_data: `task_recovery:${task.id}` }],
             [{ text: "⏰ Reschedule", callback_data: `task_snooze:${task.id}` }],
@@ -1656,11 +1734,13 @@ Possible intents are:
     For "chat", you MUST provide a friendly, encouraging, coaching response in the "chatResponse" property, written in Saarthi's voice, as a knowledgeable and supportive companion.
 11. "off_topic" -> User is asking about completely unrelated things (e.g. "who is Einstein?", "how to bake a cake", "write a python program to scrape a website", "tell me a joke").
     For "off_topic", you MUST politely explain that you are their Saarthi (personal execution companion) and that you only focus on helping them manage and execute their tasks and hit their deadlines. Provide a warm correction and direct them back to task execution in the "chatResponse" property.
+12. "create_tasks" -> User is doing a "Messy Brain Dump", listing out new tasks, commitments, assignments, deadlines, or just dumping what they have to do. (e.g. "Finish DBMS tomorrow", "I have AI assignment Friday and OS viva Monday", "Need to buy groceries tonight", "Remind me to call professor tomorrow").
+13. "overwhelmed" -> User feels stuck, overwhelmed, paralyzed, tired or unable to begin tasks. (e.g. "I'm overwhelmed", "I don't know where to start", "I can't do this", "Help me begin").
 
 Respond strictly in JSON matching the defined schema. Use 0.0 to 1.0 for confidence.`;
 
       const response = await generateContentWithRetryAndFallback(ai, {
-        model: "gemini-3.5-flash",
+        model: "gemini-2.5-flash",
         contents: `User message: "${messageText}"`,
         config: {
           systemInstruction,
@@ -1717,6 +1797,12 @@ Respond strictly in JSON matching the defined schema. Use 0.0 to 1.0 for confide
           break;
         case "progress_update":
           await this.handleExecutionUpdate(chatId, userId, messageText);
+          break;
+        case "create_tasks":
+          await this.handleCreateTasks(chatId, userId, messageText);
+          break;
+        case "overwhelmed":
+          await this.handleActivationRequest(chatId, userId);
           break;
         case "snooze":
           if (result.snoozeInfo && result.snoozeInfo.taskId && result.snoozeInfo.days && result.snoozeInfo.days > 0) {
@@ -1781,6 +1867,189 @@ Respond strictly in JSON matching the defined schema. Use 0.0 to 1.0 for confide
       } catch (innerError: any) {
         await this.sendMessage(chatId, `⚠️ Error processing message: ${innerError.message}`);
       }
+    }
+  }
+
+  /**
+   * Handle natural language brain dump for task creation (Phase 1)
+   */
+  private async handleCreateTasks(chatId: number, userId: string, messageText: string) {
+    try {
+      await this.sendChatAction(chatId, "typing");
+      const loadingMsg = await this.sendMessage(chatId, "🧠 _Analyzing your thoughts..._");
+      const loadingMsgId = loadingMsg?.message_id;
+
+      let timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      try {
+        const userSettingsSnap = await dbAdmin.collection("userSettings").doc(userId).get();
+        if (userSettingsSnap.exists) {
+          const data = userSettingsSnap.data();
+          if (data?.timezone) {
+            timezone = data.timezone;
+          }
+        }
+      } catch (err) {
+        console.warn("Could not fetch user timezone", err);
+      }
+      const now = new Date();
+      const currentDateTimeContext = now.toLocaleString("en-US", { timeZone: timezone });
+
+      const systemInstruction = `You are Saarthi, an intelligent execution companion. The user has provided a "messy brain dump" of tasks, commitments, or deadlines.
+Your job is to extract these commitments and structure them into highly actionable, specific tasks.
+
+If a task is large or complex (e.g. "Finish DBMS assignment", "Prepare for OS viva"), you MUST aggressively decompose it into smaller, actionable subtasks (each taking < 60 minutes).
+If a task is simple (e.g. "Buy groceries", "Pay bill"), 1 or 2 subtasks is enough.
+
+Current Date/Time Context: ${currentDateTimeContext} (Timezone: ${timezone})
+If the user says "tomorrow", "tonight", "Friday", calculate the correct absolute ISO string date based on the current date context. If time is not specified, default to 23:59:59 of that day.
+
+Return a JSON array of extracted commitments.`;
+
+      const response = await generateContentWithRetryAndFallback(ai, {
+        model: "gemini-2.5-flash",
+        contents: `User's Messy Brain Dump:\n\n${messageText}`,
+        config: {
+          systemInstruction,
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              commitments: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    title: { type: Type.STRING },
+                    deadline: { type: Type.STRING },
+                    priority: { type: Type.STRING, enum: ["low", "medium", "high"] },
+                    effortEstimateMinutes: { type: Type.INTEGER },
+                    projectGrouping: { type: Type.STRING },
+                    notes: { type: Type.STRING },
+                    subtasks: {
+                      type: Type.ARRAY,
+                      items: {
+                        type: Type.OBJECT,
+                        properties: {
+                          title: { type: Type.STRING },
+                          estimatedMinutes: { type: Type.INTEGER }
+                        },
+                        required: ["title"]
+                      }
+                    }
+                  },
+                  required: ["title", "deadline", "priority", "subtasks"]
+                }
+              }
+            },
+            required: ["commitments"]
+          }
+        }
+      });
+
+      const result = JSON.parse(response.text.trim());
+      const commitments = result.commitments || [];
+
+      if (commitments.length === 0) {
+        const msg = "🤷 I couldn't extract any actionable tasks from that. Could you try rephrasing?";
+        if (loadingMsgId) await this.editMessageText(chatId, loadingMsgId, msg); 
+        else await this.sendMessage(chatId, msg);
+        return;
+      }
+
+      let totalTasks = 0;
+      let totalSubtasks = 0;
+      let totalDeadlines = 0;
+
+      const batch = dbAdmin.batch();
+      
+      const createdTasks: any[] = [];
+
+      for (const commitment of commitments) {
+        totalTasks++;
+        if (commitment.deadline) totalDeadlines++;
+        
+        const subtasks = (commitment.subtasks || []).map((s: any, idx: number) => {
+          totalSubtasks++;
+          return {
+            id: `sub_${Date.now()}_${idx}_${Math.random().toString(36).substring(2,7)}`,
+            title: s.title,
+            done: false,
+            order: idx,
+            estimatedMinutes: s.estimatedMinutes || 30
+          };
+        });
+
+        if (subtasks.length === 0) {
+          subtasks.push({
+            id: `sub_${Date.now()}_0_${Math.random().toString(36).substring(2,7)}`,
+            title: commitment.title,
+            done: false,
+            order: 0,
+            estimatedMinutes: commitment.effortEstimateMinutes || 30
+          });
+          totalSubtasks++;
+        }
+
+        const taskRef = dbAdmin.collection("tasks").doc();
+        const newTask: Task = {
+          id: taskRef.id,
+          userId: userId,
+          title: commitment.title,
+          description: commitment.notes || "",
+          deadline: commitment.deadline || new Date(Date.now() + 86400000).toISOString(),
+          complexity: commitment.priority === "high" ? "high" : commitment.priority === "low" ? "low" : "medium",
+          priority: commitment.priority || "medium",
+          totalEffortMinutes: commitment.effortEstimateMinutes || subtasks.reduce((acc: number, s: any) => acc + s.estimatedMinutes, 0),
+          effortEstimateMinutes: commitment.effortEstimateMinutes || subtasks.reduce((acc: number, s: any) => acc + s.estimatedMinutes, 0),
+          subtasks: subtasks,
+          sessionsCompleted: 0,
+          sessionsPlanned: 0,
+          riskFactors: [],
+          createdAt: new Date().toISOString(),
+          googleCalendarSynced: false,
+          googleTasksSynced: false,
+          riskScore: 0,
+          riskZone: "safe"
+        };
+
+        const risk = computeRiskScore(newTask);
+        newTask.riskScore = risk.score;
+        newTask.riskZone = risk.zone;
+
+        batch.set(taskRef, newTask);
+        createdTasks.push(newTask);
+      }
+
+      await batch.commit();
+
+      const summaryCard = `━━━━━━━━━━━━━━
+🧠 I understood your thoughts.
+
+Created:
+✅ ${totalTasks} commitment${totalTasks !== 1 ? 's' : ''}
+🗓️ ${totalDeadlines} deadline${totalDeadlines !== 1 ? 's' : ''} detected
+📅 Calendar updated
+⚡ ${totalSubtasks} subtasks generated
+
+Would you like to review them?
+━━━━━━━━━━━━━━`;
+
+      const inline_keyboard = [
+        [{ text: "🖥️ Open Dashboard", url: this.getLiveAppUrl() }],
+        [{ text: "📅 Today's Plan", callback_data: "menu_today" }],
+        [{ text: "📋 View Tasks", callback_data: "tasks_list" }],
+        [{ text: "↩️ Undo", callback_data: `undo_tasks:${createdTasks.map(t => t.id).join(",")}` }]
+      ];
+
+      if (loadingMsgId) {
+        await this.editMessageText(chatId, loadingMsgId, summaryCard, { reply_markup: { inline_keyboard } });
+      } else {
+        await this.sendMessage(chatId, summaryCard, { reply_markup: { inline_keyboard } });
+      }
+
+    } catch (err: any) {
+      console.error("Error in handleCreateTasks:", err);
+      await this.sendMessage(chatId, `⚠️ Failed to parse your thoughts: ${err.message}`);
     }
   }
 
@@ -1931,12 +2200,196 @@ You must respond strictly in JSON format matching this schema:
       ];
       if (loadingMsgId) await this.editMessageText(chatId, loadingMsgId, replyMsg, { reply_markup: { inline_keyboard } }); else await this.sendMessage(chatId, replyMsg, { reply_markup: { inline_keyboard } });
 
-
     } catch (error: any) {
       console.error("Error processing NLP execution update:", error);
       await this.sendMessage(chatId, `⚠️ Failed to process update: ${error.message}`);
     }
   }
+
+  /**
+   * Generates a micro action for a stuck task and sends an Activation Card
+   */
+  private async handleActivationRequest(chatId: number, userId: string, targetTaskId?: string) {
+    try {
+      await this.sendChatAction(chatId, "typing");
+      
+      let task: Task | undefined;
+      let activeSubtask: Subtask | undefined;
+
+      if (targetTaskId) {
+        const taskSnap = await dbAdmin.collection("tasks").doc(targetTaskId).get();
+        if (taskSnap.exists) {
+          task = { id: taskSnap.id, ...taskSnap.data() } as Task;
+        }
+      } else {
+        // Find a stuck task automatically
+        const stuckTasks = await activationService.getStuckTasks(userId);
+        if (stuckTasks.length > 0) {
+          // Sort by deadline or risk to pick the most critical one
+          stuckTasks.sort((a, b) => {
+            const riskOrder = { critical: 3, watch: 2, safe: 1 };
+            if (riskOrder[a.riskZone] !== riskOrder[b.riskZone]) {
+              return riskOrder[b.riskZone] - riskOrder[a.riskZone];
+            }
+            return new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
+          });
+          task = stuckTasks[0];
+        } else {
+          // If no explicitly stuck task, just pick the next pending task
+          const allTasksSnap = await dbAdmin.collection("tasks").where("userId", "==", userId).get();
+          const activeTasks = allTasksSnap.docs
+            .map(d => ({ id: d.id, ...d.data() } as Task))
+            .filter(t => !t.subtasks.every(s => s.done))
+            .sort((a, b) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime());
+          
+          if (activeTasks.length > 0) {
+            task = activeTasks[0];
+          }
+        }
+      }
+
+      if (!task) {
+        await this.sendMessage(chatId, "💜 You actually don't have any pending tasks right now. You're completely clear. Take a rest!");
+        return;
+      }
+
+      activeSubtask = task.subtasks.find(s => !s.done);
+      
+      const action = await activationService.generateMicroAction(task, activeSubtask);
+      const session = await activationService.createActivationSession(userId, task.id, action.title, action.estimatedMinutes, activeSubtask?.id, 0);
+
+      const msg = `💜 Saarthi noticed something.
+
+That assignment looks heavier than it needs to.
+
+Forget finishing it.
+
+Can we just do ONE tiny step?
+
+━━━━━━━━━━
+
+Today's ${action.estimatedMinutes}-minute mission:
+
+📖 *${action.title}*
+
+Estimated time
+${action.estimatedMinutes} minutes
+
+━━━━━━━━━━`;
+
+      const inline_keyboard = [
+        [{ text: "🚀 Let's Start", callback_data: `activation_start:${session.id}` }],
+        [{ text: "🧩 Make It Even Smaller", callback_data: `activation_shrink:${session.id}` }],
+        [{ text: "😴 Snooze", callback_data: `task_snooze_menu:${task.id}` }],
+        [{ text: "📅 Reschedule", callback_data: `task_snooze_menu:${task.id}` }]
+      ];
+
+      await this.sendMessage(chatId, msg, { reply_markup: { inline_keyboard } });
+
+    } catch (err: any) {
+      console.error("Activation request error:", err);
+      await this.sendMessage(chatId, `⚠️ I ran into a small issue parsing your tasks. (Error: ${err.message})`);
+    }
+  }
+
+  public async handleActivationCallback(chatId: number, userId: string, action: string, sessionId: string, messageId: number) {
+    try {
+      const sessionSnap = await dbAdmin.collection("activationSessions").doc(sessionId).get();
+      if (!sessionSnap.exists) return;
+      const session = sessionSnap.data() as ActivationSession;
+
+      const taskSnap = await dbAdmin.collection("tasks").doc(session.taskId).get();
+      const task = taskSnap.exists ? { id: taskSnap.id, ...taskSnap.data() } as Task : null;
+
+      if (!task) {
+        await this.sendMessage(chatId, "⚠️ Task not found anymore.");
+        return;
+      }
+
+      if (action === "start") {
+        await dbAdmin.collection("activationSessions").doc(sessionId).update({
+          status: "active",
+          startedAt: new Date().toISOString()
+        });
+
+        const activeMsg = `⏱️ *Focus Timer Started*\n\nMission: *${session.microMissionTitle}*\n\nI'll wait right here. Come back and tap when you're done.`;
+        const inline_keyboard = [
+          [{ text: "✅ Done", callback_data: `activation_complete:${sessionId}` }],
+          [{ text: "🧩 Too Hard, Shrink It", callback_data: `activation_shrink:${sessionId}` }]
+        ];
+
+        await this.editMessageText(chatId, messageId, activeMsg, { reply_markup: { inline_keyboard } });
+      } 
+      else if (action === "shrink") {
+        await this.sendChatAction(chatId, "typing");
+        const subtask = task.subtasks.find(s => s.id === session.subtaskId);
+        const newAction = await activationService.generateMicroAction(task, subtask, session.microMissionTitle);
+        
+        // Update session
+        const newShrinkLevel = session.shrinkLevel + 1;
+        await dbAdmin.collection("activationSessions").doc(sessionId).update({
+          microMissionTitle: newAction.title,
+          estimatedMinutes: newAction.estimatedMinutes,
+          shrinkLevel: newShrinkLevel
+        });
+
+        const msg = `💜 Okay. We're breaking it down more.
+
+━━━━━━━━━━
+
+New Micro Mission:
+
+📖 *${newAction.title}*
+
+Estimated time
+${newAction.estimatedMinutes} minutes
+
+━━━━━━━━━━`;
+
+        const inline_keyboard = [
+          [{ text: "🚀 Let's Start", callback_data: `activation_start:${sessionId}` }],
+          [{ text: "🧩 Even Smaller", callback_data: `activation_shrink:${sessionId}` }],
+          [{ text: "😴 Snooze", callback_data: `task_snooze_menu:${task.id}` }]
+        ];
+
+        await this.editMessageText(chatId, messageId, msg, { reply_markup: { inline_keyboard } });
+      }
+      else if (action === "complete") {
+        const analytics = await activationService.completeActivationSession(userId, sessionId);
+
+        const msgs = [
+          "Momentum restored.",
+          "Nice. One step completed.",
+          "That's how difficult work gets finished.",
+          "Great job."
+        ];
+        const randomMsg = msgs[Math.floor(Math.random() * msgs.length)];
+        
+        // Give a slight bump to confidence
+        const oldRisk = computeRiskScore(task);
+        // We simulate a confidence bump for visual celebration, the real confidence gets updated as subtasks are marked done.
+        const confidenceBump = Math.min(100, Math.round(oldRisk.completionConfidence + 4));
+
+        let replyMsg = `🎉 *${randomMsg}*\n\n`;
+        replyMsg += `📈 Confidence increased to *${confidenceBump}%*\n`;
+        replyMsg += `🔥 Streak: *${analytics.currentStreak}*\n`;
+        replyMsg += `⚡ Momentum Score: *${analytics.momentumScore}*\n\n`;
+        replyMsg += `Would you like to do one more tiny step, or check off the subtask?`;
+
+        const inline_keyboard = [
+          [{ text: "✅ Subtask is Done", callback_data: `toggle_subtask:${task.id}:${session.subtaskId}` }],
+          [{ text: "▶️ Next Micro Step", callback_data: `activation_next:${task.id}` }],
+          [{ text: "☕ I'm Done for Now", callback_data: "menu_home" }]
+        ];
+
+        await this.editMessageText(chatId, messageId, replyMsg, { reply_markup: { inline_keyboard } });
+      }
+    } catch (err: any) {
+      console.error("Activation callback error:", err);
+      await this.sendMessage(chatId, `⚠️ ${err.message}`);
+    }
+  }
+
 }
 
 export const telegramService = new TelegramService();

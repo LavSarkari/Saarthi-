@@ -19,7 +19,8 @@ import {
   ArrowRight,
   TrendingUp,
   Check,
-  CalendarDays
+  CalendarDays,
+  Zap
 } from "lucide-react";
 import { Task, Subtask } from "../types";
 import { getHoursRemaining, formatTimeRemaining } from "../lib/riskEngine";
@@ -65,9 +66,16 @@ export default function TaskCard({
   const [editTitle, setEditTitle] = useState(task.title);
   const [editDescription, setEditDescription] = useState(task.description);
   const [editSubtasks, setEditSubtasks] = useState(task.subtasks);
+  const [editLabels, setEditLabels] = useState<string[]>(task.labels || []);
+  const [newLabelInput, setNewLabelInput] = useState("");
 
   const handleSaveEdit = () => {
-    onUpdateTask(task.id, { title: editTitle, description: editDescription, subtasks: editSubtasks });
+    onUpdateTask(task.id, { 
+      title: editTitle, 
+      description: editDescription, 
+      subtasks: editSubtasks,
+      labels: editLabels
+    });
     setIsEditing(false);
   };
 
@@ -189,6 +197,37 @@ export default function TaskCard({
                   />
                 ))}
               </div>
+              <div className="space-y-2 mt-2">
+                <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block mb-1">Labels</span>
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {editLabels.map((lbl, idx) => (
+                    <span key={idx} className="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/30 text-indigo-700 dark:text-indigo-400 text-[10px] font-medium rounded-md">
+                      {lbl}
+                      <button 
+                        onClick={() => setEditLabels(editLabels.filter((_, i) => i !== idx))}
+                        className="hover:text-indigo-900 dark:hover:text-indigo-200"
+                      >
+                        &times;
+                      </button>
+                    </span>
+                  ))}
+                </div>
+                <input
+                  value={newLabelInput}
+                  onChange={(e) => setNewLabelInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && newLabelInput.trim()) {
+                      e.preventDefault();
+                      if (!editLabels.includes(newLabelInput.trim())) {
+                        setEditLabels([...editLabels, newLabelInput.trim()]);
+                      }
+                      setNewLabelInput('');
+                    }
+                  }}
+                  className="w-full px-2 py-1 text-xs bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 rounded-md text-zinc-700 dark:text-zinc-300 focus:ring-1 focus:ring-zinc-400 outline-none"
+                  placeholder="Add label and press Enter"
+                />
+              </div>
               <div className="flex justify-end gap-2 mt-2">
                 <button 
                   onClick={() => setIsEditing(false)} 
@@ -209,6 +248,16 @@ export default function TaskCard({
               <h3 className="text-base font-semibold font-sans tracking-tight text-zinc-900 dark:text-zinc-50 leading-snug">
                 {task.title}
               </h3>
+              
+              {task.labels && task.labels.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mt-1.5 mb-2">
+                  {task.labels.map((lbl, idx) => (
+                    <span key={idx} className="inline-flex items-center px-2 py-0.5 bg-indigo-50/80 dark:bg-indigo-950/20 border border-indigo-100/50 dark:border-indigo-900/30 text-indigo-600 dark:text-indigo-400 text-[9px] uppercase tracking-wider font-semibold rounded-md">
+                      {lbl}
+                    </span>
+                  ))}
+                </div>
+              )}
               
               <p className="text-zinc-500 dark:text-zinc-400 text-[12px] leading-relaxed max-w-2xl line-clamp-2">
                 {task.description || "No description provided."}
@@ -387,21 +436,26 @@ export default function TaskCard({
               >
                 <div className="p-3 space-y-2">
                   {task.subtasks
-                    .sort((a, b) => (a.order || 0) - (b.order || 0))
+                    .sort((a, b) => {
+                      if (a.scheduledStart && b.scheduledStart) {
+                        return new Date(a.scheduledStart).getTime() - new Date(b.scheduledStart).getTime();
+                      }
+                      return (a.order || 0) - (b.order || 0);
+                    })
                     .map((sub) => (
                       <div
                         key={sub.id}
                         onClick={() => onToggleSubtask(task, sub.id)}
-                        className={`group flex items-center justify-between p-2.5 rounded-lg border transition-all cursor-pointer ${
+                        className={`group flex items-start justify-between p-2.5 rounded-lg border transition-all cursor-pointer ${
                           sub.done
                             ? "bg-emerald-50/10 dark:bg-emerald-950/10 border-emerald-100/30 dark:border-emerald-900/20 text-zinc-400 dark:text-zinc-500"
                             : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 hover:shadow-xs"
                         }`}
                       >
-                        <div className="flex items-center gap-2.5">
+                        <div className="flex items-start gap-2.5 flex-1 min-w-0 pt-0.5">
                           <button
                             type="button"
-                            className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${
+                            className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-all ${
                               sub.done
                                 ? "bg-emerald-500 border-emerald-500 text-white"
                                 : "border-zinc-300 dark:border-zinc-700 group-hover:border-zinc-400 dark:group-hover:border-zinc-500 bg-white dark:bg-zinc-900"
@@ -409,13 +463,29 @@ export default function TaskCard({
                           >
                             {sub.done && <Check className="w-2.5 h-2.5 stroke-[3.5]" />}
                           </button>
-                          <span className={`text-[11px] font-medium leading-tight ${sub.done ? "line-through text-zinc-400 dark:text-zinc-500" : "text-zinc-800 dark:text-zinc-200"}`}>
-                            {sub.title}
+                          <div className="flex flex-col min-w-0 gap-1.5 flex-1">
+                            <span className={`text-[11px] font-medium leading-tight line-clamp-2 ${sub.done ? "line-through text-zinc-400 dark:text-zinc-500" : "text-zinc-800 dark:text-zinc-200"}`}>
+                              {sub.title}
+                            </span>
+                            {sub.scheduledStart && !sub.done && (
+                              <div className="flex items-center gap-1.5 text-[10px] font-medium text-indigo-600 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-950/30 px-1.5 py-0.5 rounded w-max">
+                                <Clock className="w-3 h-3 shrink-0" />
+                                Scheduled: {new Date(sub.scheduledStart).toLocaleDateString()} at {new Date(sub.scheduledStart).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </div>
+                            )}
+                            {sub.adaptiveExplanation && !sub.done && (
+                              <span className="text-[9px] text-zinc-400 dark:text-zinc-500 flex items-center gap-1 leading-tight">
+                                <Zap className="w-2.5 h-2.5 text-amber-500 shrink-0" />
+                                {sub.adaptiveExplanation}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex flex-col items-end gap-1 shrink-0 ml-2">
+                          <span className="text-[9px] font-mono text-zinc-400 dark:text-zinc-500 bg-zinc-50 dark:bg-zinc-800 px-1.5 py-0.5 rounded border border-zinc-200/40 dark:border-zinc-800/60">
+                            {sub.estimatedMinutes}m
                           </span>
                         </div>
-                        <span className="text-[9px] font-mono text-zinc-400 dark:text-zinc-500 bg-zinc-50 dark:bg-zinc-800 px-1.5 py-0.5 rounded border border-zinc-200/40 dark:border-zinc-800/60">
-                          {sub.estimatedMinutes}m
-                        </span>
                       </div>
                     ))}
                 </div>

@@ -1,0 +1,14 @@
+{
+  "projects": {
+    "default": "influential-obelisk-6224x"
+  },
+  "targets": {
+    "influential-obelisk-6224x": {
+      "firestore": {
+        "main": [
+          "ai-studio-saarthi-e1ed445f-6800-4a3e-8d45-b1b7dcf670ef"
+        ]
+      }
+    }
+  }
+}

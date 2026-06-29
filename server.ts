@@ -16,6 +16,7 @@ import { sendError, AppError } from "./src/services/errorHandler.js";
 import { dbData, saveDb } from "./src/services/localDb.js";
 import { generateContentWithRetryAndFallback } from "./src/services/geminiCall.js";
 import { computeRiskScore } from "./src/lib/riskEngine.js";
+import { engagementService } from "./src/services/engagementService.js";
 
 dotenv.config();
 
@@ -57,13 +58,35 @@ const HOST = "0.0.0.0";
 // 1. Task Planner API: Decomposes a commitment into structured subtasks with estimated effort via plannerService
 app.post("/api/gemini/task-planner", async (req, res) => {
   try {
-    const { commitment } = req.body;
+    const { commitment, aiContext } = req.body;
     if (!commitment) {
       throw new AppError("Commitment prompt is required.", "BAD_REQUEST", 400);
     }
     const aiClient = getAiClient(req);
-    const plan = await plannerService.generateTaskPlan(commitment, aiClient);
+    const plan = await plannerService.generateTaskPlan(commitment, aiClient, aiContext);
     return res.json(plan);
+  } catch (error: any) {
+    return sendError(res, error);
+  }
+});
+
+app.post("/api/gemini/adaptive-schedule", async (req, res) => {
+  try {
+    const { userId, tasks, strategy, maxFocusDuration, preferredStartHour, preferredEndHour } = req.body;
+    if (!tasks || !strategy) {
+      throw new AppError("Tasks and strategy are required.", "BAD_REQUEST", 400);
+    }
+    const aiClient = getAiClient(req);
+    const result = await plannerService.generateAdaptiveSchedule(
+      userId,
+      tasks,
+      strategy,
+      maxFocusDuration,
+      preferredStartHour,
+      preferredEndHour,
+      aiClient
+    );
+    return res.json(result);
   } catch (error: any) {
     return sendError(res, error);
   }
@@ -194,7 +217,7 @@ app.post("/api/telegram/unlink", async (req, res) => {
 // 1ee. Sync client-side state (tasks & userSettings) with server local database cache
 app.post("/api/telegram/sync-state", (req, res) => {
   try {
-    const { userId, tasks, userSettings } = req.body;
+    const { userId, tasks, userSettings, companionProfile } = req.body;
     if (!userId) {
       return res.status(400).json({ error: "userId is required" });
     }
@@ -203,10 +226,21 @@ app.post("/api/telegram/sync-state", (req, res) => {
     if (!dbData.userSettings) dbData.userSettings = {};
     if (!dbData.tasks) dbData.tasks = {};
 
+    if (!dbData.userSettings[userId]) {
+      dbData.userSettings[userId] = {};
+    }
+
     if (userSettings) {
       dbData.userSettings[userId] = {
         ...dbData.userSettings[userId],
         ...userSettings
+      };
+    }
+    
+    if (companionProfile) {
+      dbData.userSettings[userId] = {
+        ...dbData.userSettings[userId],
+        companionProfile
       };
     }
 
@@ -297,6 +331,98 @@ app.post("/api/telegram/trigger-briefing", async (req, res) => {
   }
 });
 
+// --- Adaptive Engagement Engine API ---
+app.get("/api/engagement/status", async (req, res) => {
+  try {
+    const { userId } = req.query;
+    if (!userId) {
+      throw new AppError("userId is required for engagement status.", "BAD_REQUEST", 400);
+    }
+    const status = await engagementService.getEngagement(String(userId));
+    return res.json(status);
+  } catch (error: any) {
+    return sendError(res, error);
+  }
+});
+
+app.post("/api/engagement/quiet-hours", async (req, res) => {
+  try {
+    const { userId, start, end, enabled } = req.body;
+    if (!userId || !start || !end) {
+      throw new AppError("userId, start, and end parameters are required.", "BAD_REQUEST", 400);
+    }
+    const updated = await engagementService.saveQuietHours(String(userId), String(start), String(end), Boolean(enabled));
+    return res.json(updated);
+  } catch (error: any) {
+    return sendError(res, error);
+  }
+});
+
+app.post("/api/engagement/overwhelm", async (req, res) => {
+  try {
+    const { userId } = req.body;
+    if (!userId) {
+      throw new AppError("userId is required to register overwhelm.", "BAD_REQUEST", 400);
+    }
+    const updated = await engagementService.registerBurnoutSignal(String(userId));
+    return res.json(updated);
+  } catch (error: any) {
+    return sendError(res, error);
+  }
+});
+
+app.get("/api/engagement/briefing", async (req, res) => {
+  try {
+    const { userId, type } = req.query;
+    if (!userId || (type !== "morning" && type !== "evening")) {
+      throw new AppError("userId and a valid briefing type (morning or evening) are required.", "BAD_REQUEST", 400);
+    }
+    const aiClient = getAiClient(req);
+    const text = await engagementService.generateBriefing(String(userId), type, aiClient);
+    return res.json({ text });
+  } catch (error: any) {
+    return sendError(res, error);
+  }
+});
+
+import { activationService } from "./src/services/activationService.js";
+
+// 1h. Activation Status
+app.get("/api/activation/status", async (req, res) => {
+  try {
+    const { userId } = req.query;
+    if (!userId || typeof userId !== "string") {
+      return res.status(400).json({ error: "userId required" });
+    }
+    const analytics = await activationService.getAnalytics(userId);
+    
+    // Find active session
+    const { mockFirestore } = await import("./src/services/localDb.js");
+    const activeSessionsSnap = await (mockFirestore as any).collection("activationSessions")
+      .where("userId", "==", userId)
+      .where("status", "==", "active")
+      .get();
+    
+    let activeSession = null;
+    if (activeSessionsSnap.docs.length > 0) {
+      activeSession = { id: activeSessionsSnap.docs[0].id, ...activeSessionsSnap.docs[0].data() };
+    } else {
+      // Check pending
+      const pendingSessionsSnap = await (mockFirestore as any).collection("activationSessions")
+        .where("userId", "==", userId)
+        .where("status", "==", "pending")
+        .get();
+      if (pendingSessionsSnap.docs.length > 0) {
+        activeSession = { id: pendingSessionsSnap.docs[0].id, ...pendingSessionsSnap.docs[0].data() };
+      }
+    }
+
+    res.json({ analytics, activeSession });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // 1g. Trigger Telegram recovery alert for high-risk task
 app.post("/api/telegram/trigger-alert", async (req, res) => {
   try {
@@ -344,21 +470,30 @@ app.post("/api/gemini/ocr-commitments", async (req, res) => {
 // 2b. Explicit Recovery Planner API: Generates high-impact strategic rescue plan via recoveryService
 app.post("/api/gemini/recovery-plan", async (req, res) => {
   try {
-    const { taskTitle, description, hoursRemaining, totalEffortMinutes, subtasksLeftNames } = req.body;
-    if (!taskTitle) {
-      throw new AppError("Task title is required to plan recovery roadmaps.", "BAD_REQUEST", 400);
+    const { userId, mode } = req.body;
+    if (!userId) {
+      throw new AppError("userId is required for the Recovery Engine.", "BAD_REQUEST", 400);
     }
     const aiClient = getAiClient(req);
     const plan = await recoveryService.generateRecoveryPlan(
-      taskTitle,
-      description || "",
-      typeof hoursRemaining === "number" ? hoursRemaining : 24,
-      typeof totalEffortMinutes === "number" ? totalEffortMinutes : 120,
-      Array.isArray(subtasksLeftNames) ? subtasksLeftNames.length : 0,
-      Array.isArray(subtasksLeftNames) ? subtasksLeftNames : [],
+      userId,
+      mode || "balanced",
       aiClient
     );
     return res.json(plan);
+  } catch (error: any) {
+    return sendError(res, error);
+  }
+});
+
+app.post("/api/gemini/execute-recovery", async (req, res) => {
+  try {
+    const { userId, planId } = req.body;
+    if (!userId || !planId) {
+      throw new AppError("userId and planId are required to execute a recovery.", "BAD_REQUEST", 400);
+    }
+    await recoveryService.executeRecoveryPlan(userId, planId);
+    return res.json({ success: true });
   } catch (error: any) {
     return sendError(res, error);
   }
@@ -368,7 +503,7 @@ app.post("/api/gemini/recovery-plan", async (req, res) => {
 // 3. Multi-turn Chat, Search Grounding & Thinking Agent API
 app.post("/api/gemini/chat", async (req, res) => {
   try {
-    const { messages, userMessage, persona, enableSearch, enableThinking } = req.body;
+    const { messages, userMessage, persona, enableSearch, enableThinking, companionProfile, appContext } = req.body;
 
     if (!userMessage) {
       return res.status(400).json({ error: "userMessage is required." });
@@ -376,12 +511,26 @@ app.post("/api/gemini/chat", async (req, res) => {
 
     // Prepare system instructions for personas
     let systemInstruction = "You are Saarthi, a wise, authoritative, yet supportive AI executive guide.";
-    if (persona === "shield") {
-      systemInstruction = "You are the 'Procrastination Shield'. You identify excuses, call out distractions with playful toughness, and focus purely on getting started within the next 5 minutes. Support the user with micro-sessions.";
-    } else if (persona === "navigator") {
-      systemInstruction = "You are the 'Calm Strategic Navigator'. Your tone is incredibly calm, collected, and structured. You explain complex projects simply, break panic into peaceful steps, and plan carefully around calendar conflicts.";
-    } else if (persona === "coach") {
-      systemInstruction = "You are the 'Tough Love Taskmaker'. You are absolute in your accountability metrics. You don't tolerate slacking, remind the user of past late work, but give raw, infectious motivation to defeat avoidance.";
+    if (companionProfile) {
+      systemInstruction = `You are Saarthi, acting as '${companionProfile.activeCompanion}'. 
+Your coaching style is ${companionProfile.coachingStyle}. 
+Your motivation style is ${companionProfile.motivationStyle}.
+Your communication density should be ${companionProfile.communicationDensity}.
+You celebrate wins in a ${companionProfile.celebrationStyle} manner.
+The user has a ${companionProfile.pressureTolerance} pressure tolerance.
+Adapt your language and responses to match this profile entirely.`;
+    } else {
+      if (persona === "shield") {
+        systemInstruction = "You are the 'Procrastination Shield'. You identify excuses, call out distractions with playful toughness, and focus purely on getting started within the next 5 minutes. Support the user with micro-sessions.";
+      } else if (persona === "navigator") {
+        systemInstruction = "You are the 'Calm Strategic Navigator'. Your tone is incredibly calm, collected, and structured. You explain complex projects simply, break panic into peaceful steps, and plan carefully around calendar conflicts.";
+      } else if (persona === "coach") {
+        systemInstruction = "You are the 'Tough Love Taskmaker'. You are absolute in your accountability metrics. You don't tolerate slacking, remind the user of past late work, but give raw, infectious motivation to defeat avoidance.";
+      }
+    }
+
+    if (appContext) {
+      systemInstruction += `\n\nCURRENT APP CONTEXT:\nYou are context-aware. The user is currently looking at the '${appContext.currentView}' screen. They have ${appContext.tasksCount} total commitments, ${appContext.riskTasks} of which are in the danger zone. Tailor your response based on what screen they are looking at and their risk state.`;
     }
 
     // Determine model to use
@@ -637,13 +786,44 @@ wss.on("connection", async (clientWs, request) => {
     subtasks: (t.subtasks || []).map((s: any) => ({ id: s.id, title: s.title, done: s.done }))
   }));
 
+  const companionProfile = userId ? dbData.userSettings?.[userId]?.companionProfile : null;
+  let personaInstruction = "Your tone should be highly supportive, calm, encouraging, and extremely pragmatic.";
+  
+  if (companionProfile) {
+    personaInstruction = `You are Saarthi, acting as '${companionProfile.activeCompanion}'. 
+Your coaching style is ${companionProfile.coachingStyle}. 
+Your motivation style is ${companionProfile.motivationStyle}.
+Your communication density should be ${companionProfile.communicationDensity}.
+You celebrate wins in a ${companionProfile.celebrationStyle} manner.
+The user has a ${companionProfile.pressureTolerance} pressure tolerance.
+Adapt your language, voice speed, tone, and empathy level to match this profile entirely.`;
+  }
+
   const systemInstruction = `You are Saarthi (सारथी), the user's active, real-time voice execution assistant and executive coach.
 You are helping the user track milestones, protect their time, and rescue slipping deadlines.
 
 The user's current tasks and subtasks are:
 ${JSON.stringify(compactTasks, null, 2)}
 
-Your tone should be highly supportive, calm, encouraging, and extremely pragmatic.
+${personaInstruction}
+
+***CRITICAL ACTIVATION & RECOVERY DIRECTIVES***
+If the user says things like:
+- "I ruined my week."
+- "I'm behind."
+- "I failed."
+- "I messed up."
+- "I missed everything."
+
+Respond calmly with deep empathy. Never judge or lecture. Say something like: "It's okay. Life happens. I am initiating the Recovery OS to rebuild your week." Wait for their confirmation, and tell them to open the Recovery OS on their screen.
+
+If the user says things like:
+- "I'm overwhelmed"
+- "I don't know where to start"
+- "I can't do this"
+- "Help me begin"
+You MUST NOT give generic advice. Instead, immediately generate a "micro action" (a tiny, ridiculous 30-second to 5-minute physical/digital step to break paralysis) for one of their most critical or urgent tasks, and guide them conversationally to do just that ONE step right now.
+
 IMPORTANT Speech Directives:
 - Always speak concisely! Responses should be a single brief sentence or at most two sentences to allow for an exceptionally fast, natural, interactive conversational flow.
 - Never write extensive paragraphs or list multiple items.
@@ -934,5 +1114,44 @@ setupVite().then(() => {
     }).catch((err) => {
       console.error("Error starting Telegram Bot polling on server boot:", err);
     });
+
+    // Background worker for Daily Digests
+    const dispatchedDigests = new Set<string>();
+    setInterval(() => {
+      const now = new Date();
+
+      if (dbData.userSettings) {
+        for (const userId of Object.keys(dbData.userSettings)) {
+          const settings = dbData.userSettings[userId];
+          if (settings && settings.telegramChatId && settings.telegramAlertSlots && settings.telegramAlertsEnabled !== false) {
+            
+            let userTimeStr = now.toISOString().substring(11, 16);
+            let userDayStr = now.toISOString().split("T")[0];
+            
+            try {
+              if (settings.timezone) {
+                const timeFormatter = new Intl.DateTimeFormat("en-GB", { timeZone: settings.timezone, hour: "2-digit", minute: "2-digit" });
+                userTimeStr = timeFormatter.format(now);
+                
+                const dateFormatter = new Intl.DateTimeFormat("en-CA", { timeZone: settings.timezone, year: "numeric", month: "2-digit", day: "2-digit" });
+                userDayStr = dateFormatter.format(now);
+              }
+            } catch (err) {
+              console.error(`Invalid timezone for ${userId}: ${settings.timezone}`);
+            }
+
+            if (settings.telegramAlertSlots.includes(userTimeStr)) {
+              const digestKey = `${userId}-${userDayStr}-${userTimeStr}`;
+              if (!dispatchedDigests.has(digestKey)) {
+                dispatchedDigests.add(digestKey);
+                telegramService.handleBriefing(Number(settings.telegramChatId), userId).catch(err => {
+                  console.error(`Failed to send daily digest for ${userId}:`, err);
+                });
+              }
+            }
+          }
+        }
+      }
+    }, 15000); // Check every 15 seconds to ensure we don't miss a minute
   });
 });
