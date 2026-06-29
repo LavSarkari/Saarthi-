@@ -2956,7 +2956,7 @@ export default function App() {
               {[
                 { id: "workspace", label: "Home", icon: Activity },
                 { id: "planner", label: "New", icon: Plus },
-                { id: "tasks", label: "Tasks", icon: CheckSquare },
+                { id: "tasks", label: "Execution", icon: CheckSquare },
                 { id: "engagement", label: "Insights", icon: BarChart },
               ].map((tab) => {
                 const Icon = tab.icon;
@@ -4457,7 +4457,7 @@ export default function App() {
         <div className="md:hidden fixed bottom-4 left-4 right-4 z-[60] bg-white/80 dark:bg-zinc-900/80 backdrop-blur-2xl p-1.5 rounded-[32px] border border-zinc-200/50 dark:border-zinc-800/50 shadow-[0_8px_32px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.4)] flex items-center justify-between gap-1">
           {[
             { id: "workspace", icon: Activity, label: "Home" },
-            { id: "tasks", icon: CheckSquare, label: "Tasks" },
+            { id: "tasks", icon: CheckSquare, label: "Execution" },
             { id: "planner", icon: Plus, label: "New" },
             { id: "engagement", icon: BarChart, label: "Insights" },
             { id: "more", icon: Menu, label: "More" },

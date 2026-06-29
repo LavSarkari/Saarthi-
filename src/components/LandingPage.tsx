@@ -61,18 +61,18 @@ export default function LandingPage({
       confidence: "Scanning...",
     },
     {
-      label: "2. AI Task Decomposition",
+      label: "2. AI Execution Breakdown",
       title: "Step-by-Step Strategic Roadmap",
-      desc: "Saarthi breaks commitments down into bite-sized operational subtasks with strict recommended minute allotments.",
+      desc: "Saarthi breaks commitments down into bite-sized operational steps with strict recommended minute allotments.",
       color: "from-indigo-500 to-purple-500",
       icon: Layers,
-      status: "Decomposing to 5 subtasks",
+      status: "Decomposing to 5 steps",
       confidence: "Planning Complete",
     },
     {
       label: "3. Real-Time Risk Profiling",
       title: "Predictive Deadline Engine",
-      desc: "Our risk engine evaluates hours remaining, task complexity, and schedules to compute a Completion Confidence score.",
+      desc: "Our risk engine evaluates hours remaining, execution complexity, and schedules to compute a Completion Confidence score.",
       color: "from-pink-500 to-rose-500",
       icon: AlertTriangle,
       status: "Risk Score: 78% (Caution)",
@@ -90,7 +90,7 @@ export default function LandingPage({
     {
       label: "5. Execution & Calendar Sync",
       title: "Seamless Real-World Sync",
-      desc: "Subtasks automatically write back to your Google Calendar and Google Tasks, creating unified accountability.",
+      desc: "Milestones automatically write back to your Google Calendar and Google Tasks, creating unified accountability.",
       color: "from-emerald-400 to-teal-500",
       icon: CheckCircle2,
       status: "Synced with Google Calendar",
@@ -442,7 +442,7 @@ export default function LandingPage({
 
                 <div className="flex items-center justify-between border-b border-white/5 pb-2">
                   <span className="text-[10px] font-mono text-slate-400">
-                    ACTIVE TASK PIPELINE
+                    ACTIVE EXECUTION PIPELINE
                   </span>
                   <span className="text-[9px] font-mono text-indigo-400 animate-pulse">
                     LIVE
@@ -667,7 +667,7 @@ export default function LandingPage({
                     Execution Velocity Index
                   </h4>
                   <p className="text-[11px] text-slate-400">
-                    Tracks how fast you complete micro-tasks versus deadlines.
+                    Tracks how fast you complete micro-steps versus deadlines.
                   </p>
                 </div>
               </div>
@@ -776,7 +776,7 @@ export default function LandingPage({
 
             {/* Sliders Control Panel */}
             <div className="space-y-4">
-              {/* Task Density Slider */}
+              {/* Execution Density Slider */}
               <div className="space-y-1">
                 <div className="flex justify-between text-[11px] font-mono">
                   <span className="text-slate-400">
@@ -821,7 +821,7 @@ export default function LandingPage({
                 {/* Complexity Slider */}
                 <div className="space-y-1">
                   <div className="flex justify-between text-[11px] font-mono">
-                    <span className="text-slate-400">Task Complexity:</span>
+                    <span className="text-slate-400">Execution Complexity:</span>
                     <span className="text-white font-bold">
                       Lvl {simComplexity}/5
                     </span>
@@ -864,7 +864,7 @@ export default function LandingPage({
                     Arm Strategic Compromise Recovery Plan
                   </span>
                   <p className="text-[10px] text-slate-400">
-                    Redistributes focus tasks to secure the absolute baseline
+                    Redistributes focus steps to secure the absolute baseline
                     passing threshold.
                   </p>
                 </div>
@@ -915,7 +915,7 @@ export default function LandingPage({
                 AI-Powered Scheduling Assistance
               </h4>
               <p className="text-xs text-slate-400 leading-relaxed">
-                Breaks raw qualitative goals into logical subtasks.
+                Breaks raw qualitative goals into logical steps.
                 Automatically scales estimates using the Gemini reasoning model
                 to fit your schedule.
               </p>
@@ -927,12 +927,12 @@ export default function LandingPage({
                 <TrendingUp className="w-5 h-5" />
               </div>
               <h4 className="text-sm font-bold text-white tracking-tight">
-                Intelligent Task Prioritization
+                Execution Activation Engine
               </h4>
               <p className="text-xs text-slate-400 leading-relaxed">
                 Continually computes an active score based on deadlines,
                 remaining workload, and cognitive factors to dynamically
-                prioritize critical tasks.
+                generate frictionless starting steps.
               </p>
             </div>
 
@@ -942,11 +942,11 @@ export default function LandingPage({
                 <ShieldCheck className="w-5 h-5" />
               </div>
               <h4 className="text-sm font-bold text-white tracking-tight">
-                Personalized Productivity Recommendations
+                Behavioral Intelligence
               </h4>
               <p className="text-xs text-slate-400 leading-relaxed">
-                When a conflict is detected, click one button to compile
-                immediate tactical rescue strategies and actionable compromises.
+                When a conflict is detected, the Recovery OS compiles
+                immediate tactical rescue strategies and actionable compromises based on your learning profile.
               </p>
             </div>
 
@@ -956,12 +956,12 @@ export default function LandingPage({
                 <Camera className="w-5 h-5" />
               </div>
               <h4 className="text-sm font-bold text-white tracking-tight">
-                Autonomous Task Planning & Execution
+                Adaptive AI Planning
               </h4>
               <p className="text-xs text-slate-400 leading-relaxed">
                 Scan multiple syllabus deadlines directly from images using
                 Gemini Vision for structured import and fully autonomous
-                scheduling.
+                execution scheduling.
               </p>
             </div>
 
@@ -974,7 +974,7 @@ export default function LandingPage({
                 Calendar Integration & Goal Tracking
               </h4>
               <p className="text-xs text-slate-400 leading-relaxed">
-                Real OAuth linkage connects your active tasks to Google Calendar
+                Real OAuth linkage connects your active commitments to Google Calendar
                 and Google Tasks, creating unified goal tracking and
                 accountability.
               </p>
@@ -1159,7 +1159,7 @@ export default function LandingPage({
                 Gemini 2.5 Flash
               </h4>
               <p className="text-xs text-slate-400">
-                Powers real-time decomposition and tactical task strategy
+                Powers real-time decomposition and tactical execution strategy
                 generation with high logical throughput.
               </p>
             </div>
@@ -1186,7 +1186,7 @@ export default function LandingPage({
               </h4>
               <p className="text-xs text-slate-400">
                 Establishes bidirectional PCM voice WebSockets for natural
-                spoken productivity reviews.
+                spoken execution reflections.
               </p>
             </div>
 
