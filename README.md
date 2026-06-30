@@ -540,7 +540,7 @@ All API routes are served from the Express backend on port 3000.
 | `GET` | `/api/engagement/briefing` | Generate AI morning/evening briefing |
 | `GET` | `/api/activation/status` | Get activation analytics + active session |
 
-> 📖 For complete request/response schemas, see [docs/API_REFERENCE.md](docs/API_REFERENCE.md)
+> 📖 For complete request/response schemas, see [docs/API_REFERENCE.md](API_REFERENCE.md)
 
 <br/>
 
@@ -586,7 +586,7 @@ The build process:
 | **Railway / Render** | One-click deploy with environment variable support |
 | **Docker** | Containerize with Node.js 18+ base image |
 
-> 📖 For detailed deployment guides, see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)
+> 📖 For detailed deployment guides, see [docs/DEPLOYMENT.md](DEPLOYMENT.md)
 
 <br/>
 
@@ -614,12 +614,12 @@ Extended documentation lives in the [`docs/`](docs/) folder — fully navigable 
 
 | Document | Description |
 |:---|:---|
-| [**ARCHITECTURE.md**](docs/ARCHITECTURE.md) | Deep-dive into system architecture, data flows, and service interactions |
-| [**API_REFERENCE.md**](docs/API_REFERENCE.md) | Complete REST & WebSocket API with request/response schemas |
-| [**DEPLOYMENT.md**](docs/DEPLOYMENT.md) | Production deployment guide for Cloud Run, Docker, Railway |
-| [**TELEGRAM_SETUP.md**](docs/TELEGRAM_SETUP.md) | Step-by-step Telegram bot setup, linking flow, and daily digest configuration |
-| [**GEMINI_MODELS.md**](docs/GEMINI_MODELS.md) | AI model selection strategy, cascading, and cost optimization |
-| [**BEHAVIORAL_ENGINE.md**](docs/BEHAVIORAL_ENGINE.md) | Behavioral intelligence internals, learning profile attributes, and event types |
+| [**ARCHITECTURE.md**](ARCHITECTURE.md) | Deep-dive into system architecture, data flows, and service interactions |
+| [**API_REFERENCE.md**](API_REFERENCE.md) | Complete REST & WebSocket API with request/response schemas |
+| [**DEPLOYMENT.md**](DEPLOYMENT.md) | Production deployment guide for Cloud Run, Docker, Railway |
+| [**TELEGRAM_SETUP.md**](TELEGRAM_SETUP.md) | Step-by-step Telegram bot setup, linking flow, and daily digest configuration |
+| [**GEMINI_MODELS.md**](GEMINI_MODELS.md) | AI model selection strategy, cascading, and cost optimization |
+| [**BEHAVIORAL_ENGINE.md**](BEHAVIORAL_ENGINE.md) | Behavioral intelligence internals, learning profile attributes, and event types |
 
 <br/>
 
