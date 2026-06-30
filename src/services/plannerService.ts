@@ -529,6 +529,48 @@ Return your response strictly in the JSON schema provided.`,
       return defaultFallback;
     }
   }
+  async generateTaskRecoveryPlan(
+    taskTitle: string,
+    description: string,
+    hoursRemaining: number,
+    totalEffortMinutes: number,
+    subtasksLeftNames: string[],
+    aiClient: GoogleGenAI
+  ): Promise<{ isRecovered: boolean; situationSummary: string; messageToUser: string; advice: string }> {
+    const defaultFallback = {
+      isRecovered: false,
+      situationSummary: "Time is critically short.",
+      messageToUser: "You need to start immediately. No time for perfection.",
+      advice: "Focus only on the most critical subtasks. Drop everything else."
+    };
+
+    try {
+      const prompt = `Task: ${taskTitle}\nDescription: ${description || "None"}\nHours Remaining: ${hoursRemaining.toFixed(1)}\nEffort Remaining: ${totalEffortMinutes} minutes\nPending Subtasks: ${subtasksLeftNames.join(", ")}`;
+      
+      const response = await generateContentWithRetryAndFallback(aiClient, {
+        model: "gemini-3.1-pro-preview", // high-thinking strategist
+        contents: prompt,
+        config: {
+          systemInstruction: "You are Saarthi's Recovery Engine. The user is failing a specific task. Generate a ruthless, realistic recovery plan for this specific task. Be direct and strict.",
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              isRecovered: { type: Type.BOOLEAN, description: "Can this task actually be saved?" },
+              situationSummary: { type: Type.STRING, description: "A blunt 1-sentence assessment of the reality." },
+              messageToUser: { type: Type.STRING, description: "A direct, empathetic but firm message to the user." },
+              advice: { type: Type.STRING, description: "Specific tactical advice on what to cut and what to focus on." }
+            },
+            required: ["isRecovered", "situationSummary", "messageToUser", "advice"]
+          }
+        }
+      });
+      return extractAndParseJson(response.text || "", defaultFallback);
+    } catch (e) {
+      console.error("PlannerService.generateTaskRecoveryPlan failed", e);
+      return defaultFallback;
+    }
+  }
 }
 
 export const plannerService = new PlannerService();

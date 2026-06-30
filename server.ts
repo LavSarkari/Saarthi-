@@ -467,6 +467,28 @@ app.post("/api/gemini/ocr-commitments", async (req, res) => {
   }
 });
 
+// Task-specific Recovery Planner API: Generates a recovery plan for a single failing task
+app.post("/api/gemini/task-recovery-plan", async (req, res) => {
+  try {
+    const { taskTitle, description, hoursRemaining, totalEffortMinutes, subtasksLeftNames } = req.body;
+    if (!taskTitle) {
+      throw new AppError("taskTitle is required for the Task Recovery Engine.", "BAD_REQUEST", 400);
+    }
+    const aiClient = getAiClient(req);
+    const plan = await plannerService.generateTaskRecoveryPlan(
+      taskTitle,
+      description,
+      hoursRemaining,
+      totalEffortMinutes,
+      subtasksLeftNames,
+      aiClient
+    );
+    return res.json(plan);
+  } catch (error: any) {
+    return sendError(res, error);
+  }
+});
+
 // 2b. Explicit Recovery Planner API: Generates high-impact strategic rescue plan via recoveryService
 app.post("/api/gemini/recovery-plan", async (req, res) => {
   try {
@@ -590,7 +612,12 @@ Adapt your language and responses to match this profile entirely.`;
     });
   } catch (error: any) {
     console.error("Error in chat api route:", error);
-    return res.status(500).json({ error: error.message || "Failed to process chat query." });
+    const status = error.status || 500;
+    return res.status(status).json({ 
+      error: error.message || "Failed to process chat query.",
+      status,
+      code: error.code || "UNKNOWN"
+    });
   }
 });
 
@@ -626,7 +653,12 @@ app.post("/api/gemini/tts", async (req, res) => {
     return res.json({ audio: base64Audio });
   } catch (error: any) {
     console.error("Error in TTS route:", error);
-    return res.status(500).json({ error: error.message || "TTS Speech synthesis failed." });
+    const status = error.status || 500;
+    return res.status(status).json({ 
+      error: error.message || "TTS Speech synthesis failed.",
+      status,
+      code: error.code || "UNKNOWN"
+    });
   }
 });
 

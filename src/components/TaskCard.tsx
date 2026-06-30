@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import Markdown from "react-markdown";
 import { motion, AnimatePresence } from "motion/react";
 import {
   Sparkles,
@@ -562,7 +563,9 @@ export default function TaskCard({
                     {/* Contextual Advice */}
                     <div className="space-y-0.5">
                       <h4 className="font-semibold text-zinc-500 dark:text-zinc-400 text-[10px] uppercase tracking-wider">AI Focus Strategy</h4>
-                      <p className="text-zinc-600 dark:text-zinc-300 leading-relaxed text-[11px]">{task.reminderContext.contextualAdvice}</p>
+                      <div className="text-zinc-600 dark:text-zinc-300 leading-relaxed text-[11px] markdown-body">
+                        <Markdown>{task.reminderContext.contextualAdvice}</Markdown>
+                      </div>
                     </div>
 
                     {/* Resource Queries */}
@@ -633,12 +636,14 @@ export default function TaskCard({
           </div>
 
           <div className="text-[11px] space-y-2 leading-relaxed text-amber-900 dark:text-amber-100">
-            <p className="font-medium bg-amber-500/5 dark:bg-amber-950/30 p-2.5 rounded-lg border border-amber-500/10 text-amber-950 dark:text-amber-200">
-              💡 {task.recoveryPlan.messageToUser}
-            </p>
+            <div className="font-medium bg-amber-500/5 dark:bg-amber-950/30 p-2.5 rounded-lg border border-amber-500/10 text-amber-950 dark:text-amber-200 markdown-body">
+              <Markdown>{`💡 ${task.recoveryPlan.messageToUser}`}</Markdown>
+            </div>
             <div className="space-y-0.5">
               <span className="font-semibold text-[9px] text-zinc-400 uppercase tracking-wider block">Compromise strategy</span>
-              <p className="text-zinc-600 dark:text-zinc-300 whitespace-pre-line pl-0.5">{task.recoveryPlan.advice}</p>
+              <div className="text-zinc-600 dark:text-zinc-300 pl-0.5 markdown-body">
+                <Markdown>{task.recoveryPlan.advice}</Markdown>
+              </div>
             </div>
           </div>
         </div>

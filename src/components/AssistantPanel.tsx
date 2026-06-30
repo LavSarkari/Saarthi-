@@ -1,4 +1,5 @@
 import React from "react";
+import Markdown from "react-markdown";
 import { motion, AnimatePresence } from "motion/react";
 import {
   Sparkles,
@@ -146,49 +147,49 @@ export default function AssistantPanel({
   return (
     <div className="flex flex-col bg-white dark:bg-zinc-900 overflow-hidden h-full transition-all">
       {/* Tab bar header */}
-      <div className="flex border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-950/20 p-1 shrink-0">
+      <div className="flex p-2 shrink-0 gap-1 border-b border-zinc-200/60 dark:border-zinc-800/60">
         <button
           onClick={() => setActiveTab("chat")}
-          className={`flex-1 py-2.5 px-2 text-xs font-semibold text-center m-0.5 rounded-lg flex items-center justify-center gap-1.5 transition-colors duration-200 cursor-pointer border ${
+          className={`flex-1 py-2 px-3 text-[13px] font-semibold rounded-lg flex items-center justify-center gap-2 transition-all duration-200 outline-none ${
             activeTab === "chat"
-              ? "bg-white dark:bg-zinc-800 text-zinc-950 dark:text-zinc-50 border-zinc-200 dark:border-zinc-800 shadow-xs font-bold"
-              : "border-transparent text-zinc-500 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-zinc-50 hover:bg-zinc-100/50 dark:hover:bg-zinc-800/40"
+              ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
+              : "text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
           }`}
         >
-          <Sparkles className="w-3.5 h-3.5" />
+          <Sparkles className="w-4 h-4" />
           <span>Chat AI</span>
         </button>
 
         <button
           onClick={() => setActiveTab("voice")}
-          className={`flex-1 py-2.5 px-2 text-xs font-semibold text-center m-0.5 rounded-lg flex items-center justify-center gap-1.5 transition-colors duration-200 cursor-pointer border ${
+          className={`flex-1 py-2 px-3 text-[13px] font-semibold rounded-lg flex items-center justify-center gap-2 transition-all duration-200 outline-none ${
             activeTab === "voice"
-              ? "bg-white dark:bg-zinc-800 text-zinc-950 dark:text-zinc-50 border-zinc-200 dark:border-zinc-800 shadow-xs font-bold"
-              : "border-transparent text-zinc-500 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-zinc-50 hover:bg-zinc-100/50 dark:hover:bg-zinc-800/40"
+              ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
+              : "text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
           }`}
         >
-          <Mic className="w-3.5 h-3.5" />
+          <Mic className="w-4 h-4" />
           <span>Live Audio</span>
         </button>
 
         <button
           onClick={() => setActiveTab("poster")}
-          className={`flex-1 py-2.5 px-2 text-xs font-semibold text-center m-0.5 rounded-lg flex items-center justify-center gap-1.5 transition-colors duration-200 cursor-pointer border ${
+          className={`flex-1 py-2 px-3 text-[13px] font-semibold rounded-lg flex items-center justify-center gap-2 transition-all duration-200 outline-none ${
             activeTab === "poster"
-              ? "bg-white dark:bg-zinc-800 text-zinc-950 dark:text-zinc-50 border-zinc-200 dark:border-zinc-800 shadow-xs font-bold"
-              : "border-transparent text-zinc-500 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-zinc-50 hover:bg-zinc-100/50 dark:hover:bg-zinc-800/40"
+              ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
+              : "text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
           }`}
         >
-          <ImageIcon className="w-3.5 h-3.5" />
+          <ImageIcon className="w-4 h-4" />
           <span>Visualizer</span>
         </button>
 
         <button
           onClick={() => setActiveTab("help")}
-          className={`p-2.5 text-xs rounded-lg m-0.5 flex items-center justify-center transition-colors duration-200 cursor-pointer border ${
+          className={`w-9 h-9 shrink-0 text-sm rounded-lg flex items-center justify-center transition-all duration-200 outline-none ${
             activeTab === "help"
-              ? "bg-white dark:bg-zinc-800 text-zinc-950 dark:text-zinc-50 border-zinc-200 dark:border-zinc-800 shadow-xs font-bold"
-              : "border-transparent text-zinc-400 dark:text-zinc-500 hover:text-zinc-950 dark:hover:text-zinc-50 hover:bg-zinc-100/50 dark:hover:bg-zinc-800/40"
+              ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
+              : "text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
           }`}
           title="Saarthi FAQ Center"
         >
@@ -202,18 +203,18 @@ export default function AssistantPanel({
         {activeTab === "chat" && (
           <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
             {/* Context control line */}
-            <div className="bg-zinc-50/50 dark:bg-zinc-950/20 border-b border-zinc-200 dark:border-zinc-800 p-3 text-xs flex flex-wrap items-center justify-between gap-3 text-zinc-700 dark:text-zinc-400">
+            <div className="border-b border-zinc-200/50 dark:border-zinc-800/60 px-4 py-3 flex flex-wrap items-center justify-between gap-3 shrink-0">
               <div className="flex items-center gap-2">
-                <span className="text-zinc-400 dark:text-zinc-500 font-bold font-mono text-[10px] uppercase">COACH STYLE</span>
+                <span className="text-zinc-400 dark:text-zinc-500 font-bold font-mono text-[10px] uppercase tracking-wider">COACH STYLE</span>
                 <div className="relative z-10">
                   <button
                     onClick={() => setIsPersonaDropdownOpen(!isPersonaDropdownOpen)}
-                    className="flex items-center justify-between gap-2 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 rounded-lg px-2.5 py-1 text-xs outline-none focus:border-zinc-400 dark:focus:border-zinc-600 font-semibold cursor-pointer min-w-[170px]"
+                    className="flex items-center justify-between gap-2 bg-zinc-100 dark:bg-zinc-800/80 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-900 dark:text-zinc-100 rounded-md px-3 py-1.5 text-xs outline-none transition-colors font-semibold cursor-pointer min-w-[170px]"
                   >
                     <span>
                       {chatPersona === "navigator" ? "Calm Strategic Navigator" : chatPersona === "shield" ? "Procrastination Shield" : "Tough Love Taskmaker"}
                     </span>
-                    <ChevronDown className="w-3 h-3 text-zinc-400" />
+                    <ChevronDown className={`w-3.5 h-3.5 text-zinc-500 transition-transform ${isPersonaDropdownOpen ? "rotate-180" : ""}`} />
                   </button>
                   {isPersonaDropdownOpen && (
                     <>
@@ -221,24 +222,27 @@ export default function AssistantPanel({
                         className="fixed inset-0" 
                         onClick={() => setIsPersonaDropdownOpen(false)}
                       ></div>
-                      <div className="absolute left-0 mt-1 w-full min-w-[170px] bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg z-20 py-1 overflow-hidden font-medium">
+                      <div className="absolute left-0 mt-2 w-full min-w-[200px] bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 shadow-xl rounded-xl z-20 py-1.5 overflow-hidden font-medium animate-in fade-in slide-in-from-top-2">
                         <button
                           onClick={() => { setChatPersona("navigator"); setIsPersonaDropdownOpen(false); }}
-                          className={`w-full text-left px-3 py-1.5 text-xs hover:bg-zinc-50 dark:hover:bg-zinc-700/50 transition-colors ${chatPersona === "navigator" ? "text-indigo-600 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-900/10" : "text-zinc-700 dark:text-zinc-300"}`}
+                          className={`w-full flex items-center justify-between px-3 py-2 text-xs transition-colors ${chatPersona === "navigator" ? "bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400" : "text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800"}`}
                         >
                           Calm Strategic Navigator
+                          {chatPersona === "navigator" && <CheckCircle className="w-4 h-4" />}
                         </button>
                         <button
                           onClick={() => { setChatPersona("shield"); setIsPersonaDropdownOpen(false); }}
-                          className={`w-full text-left px-3 py-1.5 text-xs hover:bg-zinc-50 dark:hover:bg-zinc-700/50 transition-colors ${chatPersona === "shield" ? "text-indigo-600 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-900/10" : "text-zinc-700 dark:text-zinc-300"}`}
+                          className={`w-full flex items-center justify-between px-3 py-2 text-xs transition-colors ${chatPersona === "shield" ? "bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400" : "text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800"}`}
                         >
                           Procrastination Shield
+                          {chatPersona === "shield" && <CheckCircle className="w-4 h-4" />}
                         </button>
                         <button
                           onClick={() => { setChatPersona("coach"); setIsPersonaDropdownOpen(false); }}
-                          className={`w-full text-left px-3 py-1.5 text-xs hover:bg-zinc-50 dark:hover:bg-zinc-700/50 transition-colors ${chatPersona === "coach" ? "text-indigo-600 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-900/10" : "text-zinc-700 dark:text-zinc-300"}`}
+                          className={`w-full flex items-center justify-between px-3 py-2 text-xs transition-colors ${chatPersona === "coach" ? "bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400" : "text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800"}`}
                         >
                           Tough Love Taskmaker
+                          {chatPersona === "coach" && <CheckCircle className="w-4 h-4" />}
                         </button>
                       </div>
                     </>
@@ -246,30 +250,29 @@ export default function AssistantPanel({
                 </div>
               </div>
 
-              <div className="flex items-center gap-3 font-mono text-[9px] font-bold">
-                <label className="flex items-center gap-1.5 cursor-pointer text-zinc-500 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-zinc-50 transition-colors">
-                  <input
-                    type="checkbox"
-                    checked={enableGrounding}
-                    onChange={(e) => setEnableGrounding(e.target.checked)}
-                    className="rounded border-zinc-300 dark:border-zinc-700 text-zinc-950 dark:text-zinc-50 accent-zinc-950 dark:accent-zinc-50"
-                  />
-                  <span className="flex items-center gap-1">
-                    <Globe className="w-3 h-3 text-zinc-400 dark:text-zinc-500" /> Web Search
-                  </span>
-                </label>
-
-                <label className="flex items-center gap-1.5 cursor-pointer text-zinc-500 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-zinc-50 transition-colors" title="Deep reasoning thinking block">
-                  <input
-                    type="checkbox"
-                    checked={enableThinking}
-                    onChange={(e) => setEnableThinking(e.target.checked)}
-                    className="rounded border-zinc-300 dark:border-zinc-700 text-zinc-950 dark:text-zinc-50 accent-zinc-950 dark:accent-zinc-50"
-                  />
-                  <span className="flex items-center gap-1">
-                    <Brain className="w-3 h-3 text-zinc-400 dark:text-zinc-500" /> High Thinking
-                  </span>
-                </label>
+              <div className="flex items-center gap-1">
+                <button 
+                  onClick={() => setEnableGrounding(!enableGrounding)}
+                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] font-bold tracking-wide uppercase transition-colors outline-none ${
+                    enableGrounding 
+                      ? "bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400" 
+                      : "text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                  }`}
+                >
+                  <Globe className="w-3.5 h-3.5" />
+                  Web Search
+                </button>
+                <button 
+                  onClick={() => setEnableThinking(!enableThinking)}
+                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] font-bold tracking-wide uppercase transition-colors outline-none ${
+                    enableThinking 
+                      ? "bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-400" 
+                      : "text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                  }`}
+                >
+                  <Brain className="w-3.5 h-3.5" />
+                  High Thinking
+                </button>
               </div>
             </div>
 
@@ -300,15 +303,15 @@ export default function AssistantPanel({
             )}
 
              {/* Chat Messages Scrolling stream */}
-            <div ref={scrollParentRef} className="flex-1 overflow-y-auto p-5 space-y-4">
+            <div ref={scrollParentRef} className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
               {chats.length === 0 && (!userTranscript || !userTranscript.trim()) ? (
-                <div className="h-full flex flex-col items-center justify-center text-center p-6 space-y-3.5 my-8">
-                  <div className="w-12 h-12 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 rounded-2xl flex items-center justify-center shadow-xs">
-                    <Sparkles className="w-5 h-5 text-zinc-800 dark:text-zinc-200" />
+                <div className="h-full flex flex-col items-center justify-center text-center max-w-sm mx-auto space-y-4 my-8">
+                  <div className="w-14 h-14 bg-zinc-100 dark:bg-zinc-800/50 rounded-2xl flex items-center justify-center shadow-sm text-zinc-700 dark:text-zinc-300">
+                    <Sparkles className="w-6 h-6" />
                   </div>
-                  <div className="space-y-1">
-                    <p className="text-sm font-bold font-display text-zinc-900 dark:text-zinc-50">Saarthi Study Companion</p>
-                    <p className="text-[11px] text-zinc-550 dark:text-zinc-400 max-w-[280px] leading-relaxed">
+                  <div className="space-y-2">
+                    <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">Saarthi Study Companion</h3>
+                    <p className="text-[13px] text-zinc-500 dark:text-zinc-400 leading-relaxed max-w-[280px] mx-auto">
                       "I'm feeling blocked starting this essay, how do I begin?" or "Give me a checklist to study chapter 4."
                     </p>
                   </div>
@@ -320,19 +323,19 @@ export default function AssistantPanel({
                     return (
                       <div
                         key={idx}
-                        className={`flex flex-col ${isUser ? "items-end" : "items-start"} animate-fade-in`}
+                        className={`flex flex-col ${isUser ? "items-end" : "items-start"} animate-in fade-in slide-in-from-bottom-2 duration-300`}
                       >
-                        <span className="text-[9px] font-mono font-bold text-zinc-400 dark:text-zinc-505 uppercase tracking-wide mb-1 px-1">
-                          {isUser ? "You" : `${chatPersona.toUpperCase()} COACH`}
+                        <span className="text-[10px] font-semibold text-zinc-400 dark:text-zinc-500 mb-1.5 px-1">
+                          {isUser ? "You" : `${chatPersona === "navigator" ? "Strategic Navigator" : chatPersona === "shield" ? "Focus Shield" : "Coach"}`}
                         </span>
                         <div
-                          className={`p-3.5 rounded-2xl max-w-[85%] text-xs leading-relaxed whitespace-pre-wrap shadow-xs ${
+                          className={`p-3.5 rounded-2xl max-w-[88%] text-[13px] leading-relaxed shadow-sm ${
                             isUser
-                              ? "bg-zinc-950 dark:bg-zinc-100 text-white dark:text-zinc-950 rounded-tr-none animate-slide-in-right"
-                              : "bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 rounded-tl-none animate-slide-in-left"
+                              ? "bg-indigo-600 dark:bg-indigo-500 text-white rounded-tr-sm"
+                              : "bg-white dark:bg-zinc-800/80 border border-zinc-200/60 dark:border-zinc-700/50 text-zinc-800 dark:text-zinc-200 rounded-tl-sm markdown-body"
                           }`}
                         >
-                          {c.text}
+                          <Markdown>{c.text}</Markdown>
                         </div>
                       </div>
                     );
@@ -340,15 +343,15 @@ export default function AssistantPanel({
 
                   {/* Real-time speaking transcript preview */}
                   {isLiveActive && userTranscript && userTranscript.trim() !== "" && (
-                    <div className="flex flex-col items-end animate-fade-in">
-                      <span className="text-[9px] font-mono font-bold text-cyan-600 dark:text-cyan-400 uppercase tracking-wide mb-1 px-1 flex items-center gap-1.5">
+                    <div className="flex flex-col items-end animate-in fade-in duration-300">
+                      <span className="text-[10px] font-semibold text-cyan-600 dark:text-cyan-500 mb-1.5 px-1 flex items-center gap-1.5">
                         <span className="relative flex h-1.5 w-1.5">
                           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
                           <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-cyan-500"></span>
                         </span>
                         Speaking...
                       </span>
-                      <div className="p-3.5 rounded-2xl max-w-[85%] text-xs leading-relaxed whitespace-pre-wrap bg-cyan-500/5 dark:bg-cyan-950/20 border border-dashed border-cyan-500/30 text-zinc-700 dark:text-zinc-300 rounded-tr-none shadow-xs animate-pulse">
+                      <div className="p-3.5 rounded-2xl max-w-[88%] text-[13px] leading-relaxed whitespace-pre-wrap bg-cyan-50 dark:bg-cyan-500/10 border border-cyan-200/50 dark:border-cyan-500/20 text-cyan-900 dark:text-cyan-100 rounded-tr-sm shadow-sm animate-pulse">
                         {userTranscript}
                       </div>
                     </div>
@@ -393,41 +396,57 @@ export default function AssistantPanel({
             </div>
 
             {/* Chat bottom input bar */}
-            <div className="border-t border-zinc-200 dark:border-zinc-800 p-3.5 bg-zinc-50/50 dark:bg-zinc-950/10 flex gap-2 shrink-0">
-              <div className="relative flex-grow flex items-center">
-                <input
-                  type="text"
-                  value={chatInput}
-                  onChange={(e) => setChatInput(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && !isChatSending && chatInput.trim() && onSendChatMessage()}
-                  placeholder={isLiveActive ? "Voice active. Speak clearly or type..." : "Message your strategic companion..."}
-                  className="input-primary w-full py-2.5 pr-11"
-                  disabled={isChatSending}
-                />
+            <div className="p-4 bg-white dark:bg-zinc-900 shrink-0">
+              <div className="relative flex items-end gap-2 bg-zinc-100/80 dark:bg-zinc-800/50 rounded-2xl p-2 border border-zinc-200/50 dark:border-zinc-700/50 focus-within:border-indigo-500/50 dark:focus-within:border-indigo-500/50 focus-within:ring-2 focus-within:ring-indigo-500/20 transition-all">
                 
                 {/* Voice Session toggle inside text box */}
-                <button
-                  type="button"
-                  onClick={onStartLiveCall}
-                  className={`absolute right-2 p-1.5 rounded-lg cursor-pointer transition-all ${
-                    isLiveActive
-                      ? "bg-rose-500 hover:bg-rose-600 text-white animate-pulse shadow-sm"
-                      : "text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800"
-                  }`}
-                  title={isLiveActive ? "End Live Voice Connection" : "Start Live Voice Connection"}
-                >
-                  {isLiveActive ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
-                </button>
-              </div>
+                <div className="shrink-0 mb-1 ml-1">
+                  <button
+                    type="button"
+                    onClick={onStartLiveCall}
+                    className={`p-2.5 rounded-xl cursor-pointer transition-all flex items-center justify-center outline-none ${
+                      isLiveActive
+                        ? "bg-rose-500 hover:bg-rose-600 text-white animate-pulse shadow-md"
+                        : "text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-zinc-700"
+                    }`}
+                    title={isLiveActive ? "End Live Voice Connection" : "Start Live Voice Connection"}
+                  >
+                    {isLiveActive ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+                  </button>
+                </div>
 
-              <button
-                onClick={onSendChatMessage}
-                disabled={isChatSending || !chatInput.trim()}
-                className="btn-primary py-2.5 px-4.5 shrink-0"
-              >
-                <span>Send</span>
-                <Send className="w-3.5 h-3.5" />
-              </button>
+                <textarea
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      if (!isChatSending && chatInput.trim()) onSendChatMessage();
+                    }
+                  }}
+                  placeholder={isLiveActive ? "Voice active. Speak clearly or type..." : "Message your strategic companion..."}
+                  className="flex-1 bg-transparent border-none text-[15px] text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-500 focus:ring-0 resize-none py-2.5 px-2 outline-none min-h-[44px] max-h-[120px]"
+                  rows={1}
+                  disabled={isChatSending}
+                  style={{
+                    height: chatInput ? Math.min(120, Math.max(44, chatInput.split('\n').length * 24 + 20)) : 44
+                  }}
+                />
+                
+                <div className="shrink-0 mb-1 mr-1">
+                  <button
+                    onClick={onSendChatMessage}
+                    disabled={isChatSending || !chatInput.trim()}
+                    className={`p-2.5 rounded-xl transition-all flex items-center justify-center outline-none ${
+                      isChatSending || !chatInput.trim()
+                        ? "bg-zinc-200/50 dark:bg-zinc-700/50 text-zinc-400 dark:text-zinc-500 cursor-not-allowed"
+                        : "bg-indigo-600 hover:bg-indigo-700 text-white shadow-md hover:shadow-lg active:scale-95"
+                    }`}
+                  >
+                    <Send className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         )}

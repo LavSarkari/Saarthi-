@@ -133,7 +133,7 @@ Estimate the 'expectedRecovery' metrics.
 
     try {
       const response = await generateContentWithRetryAndFallback(aiClient, {
-        model: "gemini-3.5-pro-preview", // Use pro for strategic planning
+        model: "gemini-3.1-pro-preview", // Use pro for strategic planning
         contents: prompt,
         config: {
           systemInstruction: "You are the AI Recovery OS within Saarthi. Your job is to rescue users who are overwhelmed or failing their schedules. Rebuild their reality with deep empathy, tactical precision, and a zero-blame attitude.",

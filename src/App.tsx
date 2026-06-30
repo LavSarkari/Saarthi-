@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import Markdown from "react-markdown";
 import { motion, AnimatePresence } from "motion/react";
 import {
   Sparkles,
@@ -89,6 +90,8 @@ import CompanionOnboarding from "./components/CompanionOnboarding";
 import LearningCenter from "./components/LearningCenter";
 import AdaptivePlanningCenter from "./components/AdaptivePlanningCenter";
 import { behavioralIntelligenceService } from "./services/behavioralIntelligenceService";
+import { AIErrorHandler, ParsedAIError } from "./utils/AIErrorHandler";
+import AIErrorToast from "./components/AIErrorToast";
 
 const SYSTEM_ADMIN_EMAILS = [
   "luv.sarkari@gmail.com",
@@ -99,40 +102,20 @@ const SYSTEM_ADMIN_EMAILS = [
 
 async function parseApiError(
   res: Response,
-  defaultMessage: string,
-): Promise<string> {
-  let errMessage = defaultMessage;
+  isUserApiKey: boolean,
+  model: string = 'unknown'
+): Promise<ParsedAIError> {
+  let errData: any = {};
   try {
-    const errData = await res.json();
-    if (errData.error) {
-      errMessage = errData.error;
-    }
+    errData = await res.json();
   } catch (_) {}
 
-  const lowerErr = errMessage.toLowerCase();
-  if (
-    lowerErr.includes("503") ||
-    lowerErr.includes("unavailable") ||
-    lowerErr.includes("demand")
-  ) {
-    return "AI is currently experiencing high demand and is unavailable. Please wait a moment and try again.";
-  } else if (
-    lowerErr.includes("429") ||
-    lowerErr.includes("quota") ||
-    lowerErr.includes("exhausted")
-  ) {
-    return "API quota exceeded. Please try again later.";
-  }
+  // Some endpoints return { error: ... }
+  // We can pass this to the AIErrorHandler
+  const rawError = errData.error ? errData : { message: res.statusText, status: res.status, ...errData };
+  if (!rawError.status) rawError.status = res.status;
 
-  // Try to parse nested JSON if it exists
-  try {
-    const nested = JSON.parse(errMessage);
-    if (nested && nested.error && nested.error.message) {
-      errMessage = nested.error.message;
-    }
-  } catch (_) {}
-
-  return errMessage;
+  return AIErrorHandler.parseError(rawError, isUserApiKey, model);
 }
 
 export default function App() {
@@ -302,6 +285,7 @@ export default function App() {
 
   // Local notification toasts
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [aiError, setAiError] = useState<ParsedAIError | null>(null);
 
   // Active assistant tab
   const [activeTab, setActiveTab] = useState<
@@ -344,9 +328,7 @@ export default function App() {
   );
   const [isGeneratingTelegramCode, setIsGeneratingTelegramCode] =
     useState<boolean>(false);
-  const [activeSettingsTab, setActiveSettingsTab] = useState<
-    "api" | "telegram" | "companion" | "recovery"
-  >("api");
+  const [activeSettingsTab, setActiveSettingsTab] = useState<string>("api");
 
   // High-contrast theme toggling state and synchronization
   const [theme, setTheme] = useState<"light" | "dark">(() => {
@@ -378,6 +360,15 @@ export default function App() {
     setTimeout(() => {
       setToastMsg(null);
     }, 4000);
+  };
+
+  const handleAiError = (err: any, defaultMsg: string) => {
+    if (err && err.errorType && err.displayTitle) {
+      setAiError(err as ParsedAIError);
+    } else {
+      console.error(err);
+      triggerToast(`${defaultMsg}: ${err.message || String(err)}`);
+    }
   };
 
   // Parse OAuth redirect params from AI Studio Proxy
@@ -1073,11 +1064,12 @@ export default function App() {
       });
 
       if (!response.ok) {
-        const errorMsg = await parseApiError(
+        const parsedErr = await parseApiError(
           response,
-          "Failed to reach Saarthi task decomposition model.",
+          !!userApiKey,
+          "task-planner"
         );
-        throw new Error(errorMsg);
+        throw parsedErr;
       }
 
       const generatedData = await response.json();
@@ -1168,8 +1160,7 @@ export default function App() {
       triggerToast("Commitment established. Subtasks mapped & scheduled.");
       setCurrentView("planner");
     } catch (err: any) {
-      console.error(err);
-      triggerToast(`Decomposition error: ${err.message}`);
+      handleAiError(err, "Decomposition error");
     } finally {
       setIsPlanning(false);
     }
@@ -1207,11 +1198,11 @@ export default function App() {
       });
 
       if (!res.ok) {
-        const errorMsg = await parseApiError(
+        throw await parseApiError(
           res,
-          "Syllabus extract engine failed.",
+          !!userApiKey,
+          "syllabus-analyzer"
         );
-        throw new Error(errorMsg);
       }
 
       const parsedResult = await res.json();
@@ -1223,8 +1214,7 @@ export default function App() {
         );
       }
     } catch (err: any) {
-      console.error(err);
-      triggerToast(`Analysis error: ${err.message}`);
+      handleAiError(err, "Analysis error");
     } finally {
       setIsAnalyzing(false);
     }
@@ -1251,8 +1241,7 @@ export default function App() {
       });
 
       if (!res.ok) {
-        const errorMsg = await parseApiError(res, "Gemini OCR engine failed.");
-        throw new Error(errorMsg);
+        throw await parseApiError(res, !!userApiKey, "gemini-ocr-engine");
       }
 
       const parsedResult = await res.json();
@@ -1275,8 +1264,7 @@ export default function App() {
         `Extracted ${mapped.length} potential commitments from image!`,
       );
     } catch (err: any) {
-      console.error(err);
-      triggerToast(`OCR extraction error: ${err.message}`);
+      handleAiError(err, "OCR extraction error");
     } finally {
       setIsOcrProcessing(false);
     }
@@ -1330,11 +1318,11 @@ export default function App() {
         });
 
         if (!response.ok) {
-          const errorMsg = await parseApiError(
+          throw await parseApiError(
             response,
-            `Failed to decompose "${item.title}".`,
+            !!userApiKey,
+            "task-planner-decompose"
           );
-          throw new Error(errorMsg);
         }
 
         const generatedData = await response.json();
@@ -1437,8 +1425,7 @@ export default function App() {
       setAnalyzerFile(null);
       setAnalyzerPreview(null);
     } catch (err: any) {
-      console.error(err);
-      triggerToast(`Import Error: ${err.message}`);
+      handleAiError(err, "Import Error");
     } finally {
       setIsAnalyzing(false);
     }
@@ -1520,7 +1507,7 @@ export default function App() {
         .filter((s) => !s.done)
         .map((s) => s.title);
 
-      const res = await fetch("/api/gemini/recovery-plan", {
+      const res = await fetch("/api/gemini/task-recovery-plan", {
         method: "POST",
         headers: getApiHeaders(),
         body: JSON.stringify({
@@ -1533,8 +1520,7 @@ export default function App() {
       });
 
       if (!res.ok) {
-        const errorMsg = await parseApiError(res, "Rescue generation failed.");
-        throw new Error(errorMsg);
+        throw await parseApiError(res, !!userApiKey, "rescue-generator");
       }
       const plan = await res.json();
 
@@ -1566,8 +1552,7 @@ export default function App() {
         "Rescue roadmap established! Read advice below the task card.",
       );
     } catch (err: any) {
-      console.error(err);
-      triggerToast(`Rescue roadmap fail: ${err.message}`);
+      handleAiError(err, "Rescue roadmap fail");
     }
   };
 
@@ -1696,11 +1681,11 @@ export default function App() {
       });
 
       if (!res.ok) {
-        const errorMsg = await parseApiError(
+        throw await parseApiError(
           res,
-          "Unable to compile contextual reminder advice.",
+          !!userApiKey,
+          "reminder-context"
         );
-        throw new Error(errorMsg);
       }
 
       const result = await res.json();
@@ -1744,8 +1729,7 @@ export default function App() {
         "Reminder context established. Tap 'Action Steps' to view details.",
       );
     } catch (err: any) {
-      console.error(err);
-      triggerToast(`Failed to build context: ${err.message}`);
+      handleAiError(err, "Failed to build context");
     } finally {
       setGeneratingContextTaskId(null);
     }
@@ -1947,11 +1931,11 @@ export default function App() {
       });
 
       if (!res.ok) {
-        const errorMsg = await parseApiError(
+        throw await parseApiError(
           res,
-          "Chat bot communication error.",
+          !!userApiKey,
+          "chat-bot"
         );
-        throw new Error(errorMsg);
       }
 
       const result = await res.json();
@@ -1967,8 +1951,7 @@ export default function App() {
         setChatSources(result.sources);
       }
     } catch (err: any) {
-      console.error(err);
-      triggerToast(`Chat module fail: ${err.message}`);
+      handleAiError(err, "Chat module fail");
     } finally {
       setIsChatSending(false);
     }
@@ -1987,8 +1970,7 @@ export default function App() {
       });
 
       if (!res.ok) {
-        const errorMsg = await parseApiError(res, "TTS voice engine failed.");
-        throw new Error(errorMsg);
+        throw await parseApiError(res, !!userApiKey, "tts-engine");
       }
 
       const data = await res.json();
@@ -2003,8 +1985,7 @@ export default function App() {
         audioPlayerRef.current.play();
       }
     } catch (err: any) {
-      console.error(err);
-      triggerToast(`TTS Synthesis Error: ${err.message}`);
+      handleAiError(err, "TTS Synthesis Error");
     } finally {
       setIsSpeaking(false);
     }
@@ -2027,17 +2008,12 @@ export default function App() {
       });
 
       if (!res.ok) {
-        const errorMsg = await parseApiError(res, "Image compiler error.");
-        throw new Error(errorMsg);
+        throw await parseApiError(res, !!userApiKey, "image-compiler");
       }
 
       const data = await res.json();
       if (data.isFallback) {
         setGeneratedImg(data.imageUrl);
-        triggerToast(
-          data.warning ||
-            "Custom motivation wallpaper compiled matching your visual request!",
-        );
       } else {
         const base64Str = data.imageData;
         const parsedUrl = `data:image/png;base64,${base64Str}`;
@@ -2048,8 +2024,7 @@ export default function App() {
       }
       setImagePrompt("");
     } catch (err: any) {
-      console.error(err);
-      triggerToast(`Image generator fail: ${err.message}`);
+      handleAiError(err, "Image generator fail");
     } finally {
       setIsGeneratingImg(false);
     }
@@ -2916,6 +2891,20 @@ export default function App() {
       <div className="fixed inset-0 pointer-events-none bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-50/50 via-white to-white dark:from-indigo-900/10 dark:via-zinc-950 dark:to-zinc-950 z-0"></div>
       <div className="fixed inset-0 pointer-events-none bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] z-0"></div>
 
+      {/* AI Error Notification Overlay */}
+      <AIErrorToast
+        error={aiError}
+        onClose={() => setAiError(null)}
+        onRetry={() => {
+          // Can be refined later based on context, for now simple reset
+          setAiError(null);
+        }}
+        onOpenSettings={() => {
+          setAiError(null);
+          setShowSettingsModal(true);
+        }}
+      />
+
       {/* Toast Notification HUD */}
       {toastMsg && (
         <div className="fixed top-6 right-6 z-[100] bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 py-3 px-5 rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] flex items-center gap-3 transition-all duration-300 transform animate-in slide-in-from-top-5">
@@ -3024,19 +3013,24 @@ export default function App() {
               <div className="relative ml-1">
                 <button
                   onClick={() => setShowUserDropdown((prev) => !prev)}
-                  className="flex items-center justify-center hover:scale-105 transition-transform bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-700/80 p-0.5 rounded-full shadow-sm cursor-pointer outline-none focus:ring-2 focus:ring-zinc-200 dark:focus:ring-zinc-700"
+                  className="group flex items-center justify-center gap-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-all bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-700/80 pl-1 pr-2.5 py-1 rounded-full shadow-sm cursor-pointer outline-none focus:ring-2 focus:ring-zinc-200 dark:focus:ring-zinc-700"
                 >
                 {user?.photoURL ? (
                   <img
                     src={user.photoURL}
                     alt="pfp"
-                    className="w-7 h-7 rounded-full ring-2 ring-white dark:ring-zinc-900 shadow-sm"
+                    className="w-6 h-6 rounded-full shadow-sm"
                   />
                 ) : (
-                  <div className="w-7 h-7 rounded-full bg-indigo-100 dark:bg-indigo-950/40 flex items-center justify-center text-indigo-700 dark:text-indigo-300 ring-2 ring-white dark:ring-zinc-900 shadow-sm">
-                    <UserIcon className="w-4 h-4" />
+                  <div className="w-6 h-6 rounded-full bg-indigo-100 dark:bg-indigo-950/40 flex items-center justify-center text-indigo-700 dark:text-indigo-300 shadow-sm">
+                    <UserIcon className="w-3.5 h-3.5" />
                   </div>
                 )}
+                  <ChevronDown
+                    className={`w-4 h-4 text-zinc-500 transition-transform duration-300 ${
+                      showUserDropdown ? "rotate-180" : ""
+                    }`}
+                  />
               </button>
 
               {showUserDropdown && (
@@ -3130,21 +3124,23 @@ export default function App() {
         </div>
 
         <div className="flex items-center gap-2">
-          {user?.photoURL ? (
-            <img
-              onClick={() => setShowMobileMoreMenu(true)}
-              src={user.photoURL}
-              alt="pfp"
-              className="w-8 h-8 rounded-full ring-2 ring-zinc-200 dark:ring-zinc-800 shadow-sm"
-            />
-          ) : (
-            <div
-              onClick={() => setShowMobileMoreMenu(true)}
-              className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-600 dark:text-zinc-300 ring-2 ring-zinc-200 dark:ring-zinc-800 shadow-sm"
-            >
-              <UserIcon className="w-4 h-4" />
-            </div>
-          )}
+          <button
+            onClick={() => setShowMobileMoreMenu(true)}
+            className="group flex items-center justify-center gap-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-all bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-700/80 pl-1 pr-2.5 py-1 rounded-full shadow-sm cursor-pointer outline-none focus:ring-2 focus:ring-zinc-200 dark:focus:ring-zinc-700"
+          >
+            {user?.photoURL ? (
+              <img
+                src={user.photoURL}
+                alt="pfp"
+                className="w-7 h-7 rounded-full shadow-sm"
+              />
+            ) : (
+              <div className="w-7 h-7 rounded-full bg-indigo-100 dark:bg-indigo-950/40 flex items-center justify-center text-indigo-700 dark:text-indigo-300 shadow-sm">
+                <UserIcon className="w-4 h-4" />
+              </div>
+            )}
+            <ChevronDown className="w-4 h-4 text-zinc-500 transition-transform duration-300 group-hover:-translate-y-0.5" />
+          </button>
         </div>
       </header>
 
@@ -4119,12 +4115,12 @@ export default function App() {
 
                                     {t.recoveryPlan ? (
                                       <div className="space-y-1.5 text-[11px] mt-2 bg-amber-500/5 dark:bg-amber-950/30 p-2.5 rounded-lg border border-amber-200/25">
-                                        <p className="font-semibold text-amber-950 dark:text-amber-200">
-                                          💡 {t.recoveryPlan.messageToUser}
-                                        </p>
-                                        <p className="text-zinc-600 dark:text-zinc-400">
-                                          {t.recoveryPlan.advice}
-                                        </p>
+                                        <div className="font-semibold text-amber-950 dark:text-amber-200 markdown-body">
+                                          <Markdown>{`💡 ${t.recoveryPlan.messageToUser}`}</Markdown>
+                                        </div>
+                                        <div className="text-zinc-600 dark:text-zinc-400 markdown-body">
+                                          <Markdown>{t.recoveryPlan.advice}</Markdown>
+                                        </div>
                                       </div>
                                     ) : (
                                       <p className="text-[11px] text-zinc-500 leading-relaxed">
@@ -4894,7 +4890,7 @@ export default function App() {
                   <button
                     onClick={async () => {
                       if (!settingsKeyInput) return;
-                      await handleSaveSettings(settingsKeyInput, userApiKey);
+                      await handleSaveSettings();
                       setShowInitialApiPrompt(false);
                       if (!telegramChatId) setShowInitialTelegramPrompt(true);
                     }}

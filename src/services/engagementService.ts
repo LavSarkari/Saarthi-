@@ -357,7 +357,7 @@ Write the briefing beautifully formatted in Markdown. Do not include meta-text, 
 
     try {
       const response = await aiClient.models.generateContent({
-        model: "gemini-3.5-flash",
+        model: "gemini-3.1-flash-lite",
         contents: prompt
       });
       return response.text || "Failed to generate briefing. Please try again.";

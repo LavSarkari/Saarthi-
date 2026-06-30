@@ -62,6 +62,12 @@ export function sendError(res: Response, err: any): Response {
     details = err.details;
   } else if (err instanceof Error) {
     message = err.message;
+    statusCode = (err as any).status || 500;
+    code = (err as any).code || "INTERNAL_ERROR";
+  } else if (err && typeof err === 'object') {
+    message = err.message || String(err);
+    statusCode = err.status || 500;
+    code = err.code || "INTERNAL_ERROR";
   }
 
   // Ensure secrets or internal code traces aren't propagated, but log them locally
