@@ -145,6 +145,8 @@ export default function App() {
   >("landing");
   const [isCopilotOpen, setIsCopilotOpen] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [showInitialApiPrompt, setShowInitialApiPrompt] = useState(false);
+  const [showInitialTelegramPrompt, setShowInitialTelegramPrompt] = useState(false);
   const [hasDismissedActivationPrompt, setHasDismissedActivationPrompt] = useState(false);
   const [companionProfile, setCompanionProfile] =
     useState<CompanionProfile | null>(null);
@@ -377,6 +379,27 @@ export default function App() {
       setToastMsg(null);
     }, 4000);
   };
+
+  // Parse OAuth redirect params from AI Studio Proxy
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const proxyAccessToken = params.get("access_token");
+    const error = params.get("error");
+
+    if (proxyAccessToken) {
+      triggerToast("Google Workspace connected successfully!");
+      // Since it's a front-end client app and the proxy flow returns tokens directly,
+      // we store it in localStorage so the Calendar service can use it.
+      // (For production apps with backends, refresh_token should be securely stored).
+      localStorage.setItem("saarthi_workspace_access_token", proxyAccessToken);
+      
+      // Clean up URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } else if (error) {
+      triggerToast("Failed to connect Google Workspace: " + error);
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, []);
 
   // Initialize Auth state
   useEffect(() => {
@@ -1735,9 +1758,10 @@ export default function App() {
 
   // Push work sessions directly to Google Calendar using cached accessToken
   const handleSyncToGoogleCalendar = async (task: Task) => {
-    if (!accessToken) {
+    const workspaceToken = localStorage.getItem("saarthi_workspace_access_token") || accessToken;
+    if (!workspaceToken) {
       triggerToast(
-        "Missing valid Google access tokens. Sign out and log in again.",
+        "Missing valid Workspace connection. Connect Google Workspace in Settings.",
       );
       return;
     }
@@ -1756,7 +1780,7 @@ export default function App() {
 
       const result = await calendarService.syncTaskCalendarEvents(
         task,
-        accessToken,
+        workspaceToken,
         userTimeZone,
       );
 
@@ -1812,11 +1836,12 @@ export default function App() {
     }
   };
 
-  // Push to Google Tasks using cached accessToken
+  // Push to Google Tasks using cached workspaceToken
   const handleSyncToGoogleTasks = async (task: Task) => {
-    if (!accessToken) {
+    const workspaceToken = localStorage.getItem("saarthi_workspace_access_token") || accessToken;
+    if (!workspaceToken) {
       triggerToast(
-        "Missing valid Google access tokens. Sign out and log in again.",
+        "Missing valid Workspace connection. Connect Google Workspace in Settings.",
       );
       return;
     }
@@ -1844,7 +1869,7 @@ export default function App() {
           {
             method: "POST",
             headers: {
-              Authorization: `Bearer ${accessToken}`,
+              Authorization: `Bearer ${workspaceToken}`,
               "Content-Type": "application/json",
             },
             body: JSON.stringify(taskData),
@@ -2929,7 +2954,15 @@ export default function App() {
         )}
 
       {/* Floating App Navigation Island (Desktop) */}
-      <div className="hidden md:flex fixed top-4 left-1/2 -translate-x-1/2 z-50 w-[95%] max-w-5xl pointer-events-none transition-all duration-300">
+      <div
+        className={`hidden md:flex fixed ${
+          user &&
+          !SYSTEM_ADMIN_EMAILS.includes(user.email?.toLowerCase() || "") &&
+          !userApiKey
+            ? "top-14"
+            : "top-4"
+        } left-1/2 -translate-x-1/2 z-50 w-[95%] max-w-5xl pointer-events-none transition-all duration-300`}
+      >
         <header className="w-full bg-white/70 dark:bg-zinc-900/70 backdrop-blur-2xl border border-zinc-200/60 dark:border-zinc-700/60 shadow-[0_8px_32px_rgba(0,0,0,0.06)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.4)] rounded-[24px] px-3 py-2 flex items-center justify-between pointer-events-auto relative">
           {/* Logo */}
           <div className="flex-1 flex justify-start">
@@ -3117,7 +3150,7 @@ export default function App() {
 
       {/* Main Single Screen Layout */}
       {/* Increased top padding on md to account for floating header */}
-      <main className="max-w-[1400px] mx-auto w-full px-4 sm:px-6 py-4 sm:py-6 md:pt-28 md:pb-12 flex flex-col gap-4 sm:gap-8 flex-1 pb-[140px] md:pb-[180px] overflow-x-hidden relative">
+      <main className="max-w-[1400px] mx-auto w-full px-4 sm:px-6 py-4 sm:py-6 md:pt-36 md:pb-12 flex flex-col gap-4 sm:gap-8 flex-1 pb-[140px] md:pb-[180px] overflow-x-hidden relative">
         <AnimatePresence mode="wait">
           {currentView === "planner" && (
             <motion.div
@@ -4721,9 +4754,15 @@ export default function App() {
       {showOnboarding && user && (
         <CompanionOnboarding
           userId={user.uid}
-          onComplete={async (profile) => {
-            await handleUpdateCompanionProfile(profile);
+          onComplete={(profile) => {
             setShowOnboarding(false);
+            handleUpdateCompanionProfile(profile).then(() => {
+              if (!userApiKey) {
+                setShowInitialApiPrompt(true);
+              } else if (!telegramChatId) {
+                setShowInitialTelegramPrompt(true);
+              }
+            }).catch(console.error);
           }}
         />
       )}
@@ -4810,6 +4849,124 @@ export default function App() {
               </div>
             </motion.div>
           </>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showInitialApiPrompt && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-zinc-900/40 dark:bg-black/60 backdrop-blur-sm p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl border border-zinc-200 dark:border-zinc-800 w-full max-w-md overflow-hidden relative"
+            >
+              <button
+                onClick={() => {
+                  setShowInitialApiPrompt(false);
+                  if (!telegramChatId) setShowInitialTelegramPrompt(true);
+                  triggerToast("You can configure your API key later in Settings.");
+                }}
+                className="absolute top-4 right-4 p-2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 bg-zinc-100 dark:bg-zinc-800 rounded-full transition-colors z-10 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              <div className="p-8">
+                <div className="w-12 h-12 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400 rounded-2xl flex items-center justify-center mb-6">
+                  <Zap className="w-6 h-6" />
+                </div>
+                <h2 className="text-2xl font-bold font-display text-zinc-900 dark:text-zinc-50 mb-3 tracking-tight">
+                  Connect AI Engine
+                </h2>
+                <p className="text-zinc-500 dark:text-zinc-400 text-sm mb-6 leading-relaxed">
+                  Saarthi requires a Gemini API key to power its strategic planning and recovery features. Your key is stored securely in your browser and Firebase.
+                </p>
+
+                <div className="space-y-4">
+                  <input
+                    type="password"
+                    placeholder="AIzaSy..."
+                    value={settingsKeyInput}
+                    onChange={(e) => setSettingsKeyInput(e.target.value)}
+                    className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
+                  />
+                  <button
+                    onClick={async () => {
+                      if (!settingsKeyInput) return;
+                      await handleSaveSettings(settingsKeyInput, userApiKey);
+                      setShowInitialApiPrompt(false);
+                      if (!telegramChatId) setShowInitialTelegramPrompt(true);
+                    }}
+                    disabled={!settingsKeyInput}
+                    className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-bold py-3 rounded-xl transition-all cursor-pointer"
+                  >
+                    Save API Key
+                  </button>
+                  <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="block text-center text-xs text-indigo-600 dark:text-indigo-400 hover:underline">
+                    Get a Gemini API Key (Free)
+                  </a>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showInitialTelegramPrompt && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-zinc-900/40 dark:bg-black/60 backdrop-blur-sm p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl border border-zinc-200 dark:border-zinc-800 w-full max-w-md overflow-hidden relative"
+            >
+              <button
+                onClick={() => {
+                  setShowInitialTelegramPrompt(false);
+                  triggerToast("You can configure Telegram later in Settings.");
+                }}
+                className="absolute top-4 right-4 p-2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 bg-zinc-100 dark:bg-zinc-800 rounded-full transition-colors z-10 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              <div className="p-8">
+                <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 rounded-2xl flex items-center justify-center mb-6">
+                  <MessageSquare className="w-6 h-6" />
+                </div>
+                <h2 className="text-2xl font-bold font-display text-zinc-900 dark:text-zinc-50 mb-3 tracking-tight">
+                  Telegram Companion
+                </h2>
+                <p className="text-zinc-500 dark:text-zinc-400 text-sm mb-6 leading-relaxed">
+                  Would you like to integrate Telegram? This enables real-time execution accountability, morning briefings, and remote task creation.
+                </p>
+
+                <div className="space-y-3">
+                  <button
+                    onClick={() => {
+                      setShowInitialTelegramPrompt(false);
+                      setActiveSettingsTab("telegram");
+                      setShowSettingsModal(true);
+                    }}
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition-all cursor-pointer"
+                  >
+                    Setup Telegram
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowInitialTelegramPrompt(false);
+                      triggerToast("You can configure Telegram later in Settings.");
+                    }}
+                    className="w-full bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-bold py-3 rounded-xl transition-all cursor-pointer"
+                  >
+                    Skip for now
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
     </div>

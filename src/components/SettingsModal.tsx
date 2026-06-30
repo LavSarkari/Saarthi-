@@ -18,13 +18,14 @@ import {
   LogOut,
   HeartHandshake,
   Brain,
+  Calendar,
 } from "lucide-react";
 import CompanionCenter from "./CompanionCenter";
 import RecoveryCenter from "./RecoveryCenter";
 import LearningCenter from "./LearningCenter";
 import { CompanionProfile } from "../types";
 
-export type SettingsTab = "api" | "telegram" | "companion" | "recovery" | "memory";
+export type SettingsTab = "api" | "telegram" | "workspace" | "companion" | "recovery" | "memory";
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -161,7 +162,23 @@ export default function SettingsModal({
                       <div className="w-7 h-7 md:w-auto md:h-auto rounded-lg bg-[#24A1DE]/10 md:bg-transparent text-[#24A1DE] md:text-inherit flex items-center justify-center shrink-0">
                         <ExternalLink className="w-4 h-4" />
                       </div>
-                      Integrations
+                      Telegram
+                    </div>
+                    <ExternalLink className="w-4 h-4 text-zinc-300 md:hidden" />
+                  </button>
+                  <button
+                    onClick={() => handleTabSelect("workspace")}
+                    className={`w-full flex items-center justify-between md:justify-start gap-3 px-4 md:px-3 py-3.5 md:py-2.5 md:rounded-lg text-[15px] md:text-sm font-medium md:font-semibold transition-colors ${
+                      activeTab === "workspace"
+                        ? "md:bg-white md:dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 md:shadow-sm"
+                        : "text-zinc-700 dark:text-zinc-300 md:text-zinc-600 md:dark:text-zinc-400 hover:bg-zinc-50 md:hover:bg-zinc-200/50 dark:hover:bg-zinc-900 md:dark:hover:bg-zinc-800/50"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-7 h-7 md:w-auto md:h-auto rounded-lg bg-orange-50 md:bg-transparent text-orange-600 md:text-inherit flex items-center justify-center shrink-0">
+                        <Calendar className="w-4 h-4" />
+                      </div>
+                      Google Workspace
                     </div>
                     <ExternalLink className="w-4 h-4 text-zinc-300 md:hidden" />
                   </button>
@@ -641,6 +658,56 @@ export default function SettingsModal({
                     )}
                   </motion.div>
                 )}
+                
+                {activeTab === "workspace" && (
+                  <motion.div
+                    key="workspace-panel"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.15 }}
+                    className="max-w-2xl"
+                  >
+                    <div className="mb-8">
+                      <h2 className="text-2xl font-bold font-display text-zinc-900 dark:text-zinc-50 tracking-tight">
+                        Google Workspace
+                      </h2>
+                      <p className="text-zinc-500 dark:text-zinc-400 mt-1">
+                        Connect your schedule directly to Saarthi.
+                      </p>
+                    </div>
+
+                    <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl overflow-hidden p-6 md:p-8 space-y-6">
+                      <div className="flex items-start gap-4">
+                        <div className="w-12 h-12 bg-orange-100 dark:bg-orange-900/30 text-orange-600 rounded-2xl flex items-center justify-center shrink-0">
+                          <Calendar className="w-6 h-6" />
+                        </div>
+                        <div className="flex-1">
+                          <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-50 mb-2 tracking-tight">
+                            Connect Google Calendar & Tasks
+                          </h3>
+                          <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-6 leading-relaxed">
+                            Integrate your Google Calendar and Google Tasks to enable automatic schedule syncing, conflict detection, and smart task management directly from your dashboard.
+                          </p>
+                          <button
+                            onClick={() => {
+                              const SCOPES = [
+                                "https://www.googleapis.com/auth/calendar",
+                                "https://www.googleapis.com/auth/tasks"
+                              ];
+                              window.location.href = `/_proxy/oauth/login?scopes=${encodeURIComponent(SCOPES.join(","))}&redirect_uri=${encodeURIComponent(window.location.origin)}`;
+                            }}
+                            className="bg-zinc-900 dark:bg-zinc-100 hover:bg-zinc-800 dark:hover:bg-zinc-200 text-white dark:text-zinc-900 font-bold py-3 px-6 rounded-xl transition-all cursor-pointer flex items-center gap-2"
+                          >
+                            <Calendar className="w-5 h-5" />
+                            Connect via Google
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+
                 {activeTab === "companion" && (
                   <motion.div
                     key="companion-panel"

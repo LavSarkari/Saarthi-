@@ -12,9 +12,7 @@ export const db = firebaseConfig.firestoreDatabaseId
   : getFirestore(app);
 
 const provider = new GoogleAuthProvider();
-// Request Google Calendar and Google Tasks scopes as requested
-provider.addScope("https://www.googleapis.com/auth/calendar");
-provider.addScope("https://www.googleapis.com/auth/tasks");
+// Request Google Calendar and Google Tasks scopes via AI Studio proxy instead to prevent unverified app errors.
 
 // Flag to indicate if we are currently signing in
 let isSigningIn = false;

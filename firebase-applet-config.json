@@ -3,8 +3,8 @@
   "appId": "1:451366367260:web:30ba8aceb437329df2afd9",
   "apiKey": "AIzaSyBDQtDI23hvxNwEM1I5ZZ74-QSscOJGsRs",
   "authDomain": "influential-obelisk-6224x.firebaseapp.com",
-  "firestoreDatabaseId": "ai-studio-saarthi-e1ed445f-6800-4a3e-8d45-b1b7dcf670ef",
   "storageBucket": "influential-obelisk-6224x.firebasestorage.app",
   "messagingSenderId": "451366367260",
-  "measurementId": ""
+  "measurementId": "",
+  "firestoreDatabaseId": "ai-studio-saarthi-e1ed445f-6800-4a3e-8d45-b1b7dcf670ef"
 }

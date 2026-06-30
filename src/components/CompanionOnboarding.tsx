@@ -116,7 +116,7 @@ export default function CompanionOnboarding({ onComplete, userId }: CompanionOnb
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-zinc-50 dark:bg-zinc-950 p-4">
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-zinc-50/95 dark:bg-zinc-950/95 backdrop-blur-md p-4">
       <div className="w-full max-w-xl">
         <div className="text-center mb-10">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400 mb-6 shadow-sm">
