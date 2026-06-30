@@ -19,6 +19,13 @@
 
 <br/>
 
+### 📑 Documentation Hub
+
+| [🏗️ Architecture](ARCHITECTURE.md) | [📡 API](API_REFERENCE.md) | [☁️ Deploy](DEPLOYMENT.md) | [🤖 Telegram](TELEGRAM_SETUP.md) | [🧠 Models](GEMINI_MODELS.md) | [📊 Behaviors](BEHAVIORAL_ENGINE.md) |
+| :---: | :---: | :---: | :---: | :---: | :---: |
+
+<br/>
+
 ---
 
 **Saarthi** is not a to-do list. It is an **AI-powered behavioral execution engine** that decomposes goals, predicts failure, intervenes emotionally, and rescues deadlines — all powered by **Google Gemini** and deeply integrated with **Google Workspace** and **Telegram**.
