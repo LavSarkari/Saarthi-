@@ -1,8 +1,31 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    
+    // Global function
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    match /tasks/{taskId} {
+      allow read, write: if isSignedIn();
+    }
+    
+    match /userSettings/{userId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /RecurringCommitments/{commitmentId} {
+      allow read, write: if isSignedIn() && (resource == null || resource.data.userId == request.auth.uid) && (request.resource == null || request.resource.data.userId == request.auth.uid);
+    }
+    
+    match /RecurringInstances/{instanceId} {
+      allow read, write: if isSignedIn() && (resource == null || resource.data.userId == request.auth.uid) && (request.resource == null || request.resource.data.userId == request.auth.uid);
+    }
+    
+    // Catch-all
     match /{document=**} {
-      allow read, write: if true;
+      allow read, write: if isSignedIn();
     }
   }
 }

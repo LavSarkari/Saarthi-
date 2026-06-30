@@ -64,6 +64,7 @@ export interface Task {
   // Used by Activation Engine to mark tasks as "stuck"
   isStuck?: boolean;
   isCompleted?: boolean;
+  orderIndex?: number;
 }
 
 export type RecoveryMode = "minimal" | "balanced" | "maximum" | "wellness";
@@ -290,5 +291,84 @@ export interface LearningProfile {
   weeklyConsistencyScore?: LearnedAttribute;
   learningConfidence: number;
   lastUpdated: string;
+}
+
+export type RecurringCompletionMode = "binary" | "progress" | "timer" | "count" | "custom";
+export type RecurringRepeatRule = "daily" | "weekdays" | "weekends" | "weekly" | "biweekly" | "monthly" | "yearly" | "custom";
+
+export interface RecurringCommitment {
+  id: string;
+  userId: string;
+  title: string;
+  description?: string;
+  category?: string;
+  priority: "low" | "medium" | "high";
+  
+  completionMode: RecurringCompletionMode;
+  goalValue?: number; // e.g., 4 for DSA, 20 for pages
+  goalUnit?: string;  // e.g., "Questions", "Pages", "Liters", "Minutes"
+  
+  repeatRule: RecurringRepeatRule;
+  customRuleContext?: string; // If custom, store RRULE or description
+
+  preferredTime?: string;
+  preferredFocusWindow?: string;
+  softDeadline?: string;
+  hardDeadline?: string;
+  estimatedDurationMinutes: number;
+
+  activationEnabled: boolean;
+  recoveryEnabled: boolean;
+  telegramEnabled: boolean;
+  calendarEnabled: boolean;
+  behaviorLearningEnabled: boolean;
+  autoReschedule: boolean;
+
+  skipAllowance: number;
+  skipCount: number;
+  monthlySkipBudget: number;
+
+  currentStreak: number;
+  longestStreak: number;
+  consistencyPercent: number;
+  averageCompletionTime?: string;
+  averageDelayMinutes?: number;
+  averageDurationMinutes?: number;
+  behaviorConfidence: number;
+
+  createdAt: string;
+  updatedAt: string;
+  archived: boolean;
+}
+
+export type RecurringInstanceStatus = "pending" | "active" | "completed" | "failed" | "skipped" | "recovered";
+
+export interface RecurringInstance {
+  id: string;
+  userId: string;
+  commitmentId: string;
+  date: string; // YYYY-MM-DD
+  
+  title: string;
+  
+  status: RecurringInstanceStatus;
+  
+  progressValue: number; // For progress/count based
+  goalValue: number;
+  goalUnit: string;
+  
+  estimatedDurationMinutes: number;
+  actualDurationMinutes?: number;
+  
+  scheduledStart?: string;
+  scheduledEnd?: string;
+  
+  startedAt?: string;
+  completedAt?: string;
+  
+  recoveryId?: string; // If this instance went through recovery
+  
+  createdAt: string;
+  updatedAt: string;
 }
 

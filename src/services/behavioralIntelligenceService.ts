@@ -23,7 +23,7 @@ export const behavioralIntelligenceService = {
    * Tracks a behavioral event and triggers async learning updates.
    */
   async trackEvent(
-    eventData: Omit<BehavioralEvent, "id" | "timestamp">
+    eventData: Omit<BehavioralEvent, "id" | "timestamp">,
   ): Promise<void> {
     if (eventData.userId === "sandbox_sim_luv_sarkari_gmail_com") return;
     try {
@@ -34,13 +34,18 @@ export const behavioralIntelligenceService = {
       };
 
       // In a real production app, we would write this to a subcollection
-      const eventsRef = collection(db, "users", event.userId, "behavioralEvents");
+      const eventsRef = collection(
+        db,
+        "users",
+        event.userId,
+        "behavioralEvents",
+      );
       await addDoc(eventsRef, event);
 
       // Trigger profile recalculation based on the new event
       // We don't await this to keep tracking fast
       this.processLearningRules(event.userId).catch((err) =>
-        console.error("Failed to process learning rules:", err)
+        console.error("Failed to process learning rules:", err),
       );
     } catch (error) {
       console.error("Error tracking behavioral event:", error);
@@ -84,7 +89,7 @@ export const behavioralIntelligenceService = {
     if (userId === "sandbox_sim_luv_sarkari_gmail_com") return;
     try {
       const eventsRef = collection(db, "users", userId, "behavioralEvents");
-      // For performance in prototype, we just grab all events. 
+      // For performance in prototype, we just grab all events.
       // In production we would process incrementally or use Cloud Functions.
       const q = query(eventsRef, orderBy("timestamp", "desc"));
       const snapshot = await getDocs(q);
@@ -92,17 +97,23 @@ export const behavioralIntelligenceService = {
 
       if (events.length === 0) return;
 
-      const profile = (await this.getLearningProfile(userId)) || this.generateDefaultProfile(userId);
+      const profile =
+        (await this.getLearningProfile(userId)) ||
+        this.generateDefaultProfile(userId);
       const now = new Date().toISOString();
       let updated = false;
 
       // Rule 1: Preferred Work Hours
-      const taskCompletions = events.filter((e) => e.eventType === "TASK_COMPLETED");
+      const taskCompletions = events.filter(
+        (e) => e.eventType === "TASK_COMPLETED",
+      );
       if (taskCompletions.length >= 5) {
-        const hours = taskCompletions.map((e) => new Date(e.timestamp).getHours());
+        const hours = taskCompletions.map((e) =>
+          new Date(e.timestamp).getHours(),
+        );
         const nightCount = hours.filter((h) => h >= 18 || h < 4).length;
         const morningCount = hours.filter((h) => h >= 5 && h < 12).length;
-        
+
         let value = "Flexible";
         let source = "Mixed observation";
         if (nightCount / taskCompletions.length > 0.6) {
@@ -124,15 +135,23 @@ export const behavioralIntelligenceService = {
       }
 
       // Rule 2: Optimal Focus Duration
-      const focusSessions = events.filter((e) => e.eventType === "FOCUS_SESSION_COMPLETED");
+      const focusSessions = events.filter(
+        (e) => e.eventType === "FOCUS_SESSION_COMPLETED",
+      );
       if (focusSessions.length >= 3) {
         const successful = focusSessions.filter(
-          (e) => e.completionState === "success" || e.completionState === "partial"
+          (e) =>
+            e.completionState === "success" || e.completionState === "partial",
         );
         if (successful.length > 0) {
-          const totalMins = successful.reduce((sum, e) => sum + (e.durationMinutes || 0), 0);
+          const totalMins = successful.reduce(
+            (sum, e) => sum + (e.durationMinutes || 0),
+            0,
+          );
           const avgMins = Math.round(totalMins / successful.length);
-          const longest = Math.max(...successful.map((e) => e.durationMinutes || 0));
+          const longest = Math.max(
+            ...successful.map((e) => e.durationMinutes || 0),
+          );
 
           profile.averageFocusDurationMinutes = {
             value: avgMins,
@@ -141,7 +160,7 @@ export const behavioralIntelligenceService = {
             lastUpdated: now,
             source: `Calculated from ${successful.length} successful focus sessions.`,
           };
-          
+
           profile.longestSuccessfulFocusDurationMinutes = {
             value: longest,
             confidence: Math.min(100, successful.length * 10),
@@ -154,10 +173,14 @@ export const behavioralIntelligenceService = {
       }
 
       // Rule 3: Recovery Effectiveness
-      const recoveryAccepted = events.filter((e) => e.eventType === "RECOVERY_ACCEPTED").length;
-      const recoveryRejected = events.filter((e) => e.eventType === "RECOVERY_REJECTED").length;
+      const recoveryAccepted = events.filter(
+        (e) => e.eventType === "RECOVERY_ACCEPTED",
+      ).length;
+      const recoveryRejected = events.filter(
+        (e) => e.eventType === "RECOVERY_REJECTED",
+      ).length;
       const totalRecovery = recoveryAccepted + recoveryRejected;
-      
+
       if (totalRecovery >= 3) {
         const rate = Math.round((recoveryAccepted / totalRecovery) * 100);
         profile.recoverySuccessRate = {
@@ -174,19 +197,28 @@ export const behavioralIntelligenceService = {
       let totalEvidence = 0;
       let attributeCount = 0;
       Object.values(profile).forEach((val) => {
-        if (val && typeof val === 'object' && 'evidenceCount' in val) {
+        if (val && typeof val === "object" && "evidenceCount" in val) {
           totalEvidence += (val as LearnedAttribute).evidenceCount;
           attributeCount++;
         }
       });
-      
+
       if (attributeCount > 0) {
-         profile.learningConfidence = Math.min(100, Math.round(totalEvidence * 2));
+        profile.learningConfidence = Math.min(
+          100,
+          Math.round(totalEvidence * 2),
+        );
       }
 
       if (updated) {
         profile.lastUpdated = now;
-        const profileRef = doc(db, "users", userId, "learningProfile", "current");
+        const profileRef = doc(
+          db,
+          "users",
+          userId,
+          "learningProfile",
+          "current",
+        );
         await setDoc(profileRef, profile, { merge: true });
       }
     } catch (error) {
@@ -197,33 +229,55 @@ export const behavioralIntelligenceService = {
   /**
    * Generates a context summary string for AI prompts.
    */
-  generateAiContext(profile: LearningProfile | null): string {
-    if (!profile) return "No behavioral intelligence data available yet.";
-
+  generateAiContext(
+    profile: LearningProfile | null,
+    recurringCommitments?: any[],
+  ): string {
     const lines: string[] = ["Behavioral Intelligence Context:"];
-    
-    if (profile.preferredWorkHours) {
-      lines.push(`• Best work window: ${profile.preferredWorkHours.value}`);
-    }
-    
-    if (profile.averageFocusDurationMinutes) {
-      lines.push(`• Optimal focus duration: ${profile.averageFocusDurationMinutes.value} minutes`);
-    }
 
-    if (profile.recoverySuccessRate) {
-      if (profile.recoverySuccessRate.value > 60) {
-        lines.push(`• Recovery plans are highly effective (${profile.recoverySuccessRate.value}% acceptance)`);
-      } else {
-        lines.push(`• Recovery plans are rarely accepted (${profile.recoverySuccessRate.value}% acceptance)`);
+    if (profile) {
+      if (profile.preferredWorkHours) {
+        lines.push(`• Best work window: ${profile.preferredWorkHours.value}`);
+      }
+
+      if (profile.averageFocusDurationMinutes) {
+        lines.push(
+          `• Optimal focus duration: ${profile.averageFocusDurationMinutes.value} minutes`,
+        );
+      }
+
+      if (profile.recoverySuccessRate) {
+        if (profile.recoverySuccessRate.value > 60) {
+          lines.push(
+            `• Recovery plans are highly effective (${profile.recoverySuccessRate.value}% acceptance)`,
+          );
+        } else {
+          lines.push(
+            `• Recovery plans are rarely accepted (${profile.recoverySuccessRate.value}% acceptance)`,
+          );
+        }
+      }
+
+      if (profile.mostDelayedSubject) {
+        lines.push(
+          `• ${profile.mostDelayedSubject.value} tasks are frequently delayed`,
+        );
+      }
+
+      if (profile.learningConfidence > 0) {
+        lines.push(
+          `• Overall AI Profile Confidence: ${profile.learningConfidence}%`,
+        );
       }
     }
-    
-    if (profile.mostDelayedSubject) {
-      lines.push(`• ${profile.mostDelayedSubject.value} tasks are frequently delayed`);
-    }
 
-    if (profile.learningConfidence > 0) {
-       lines.push(`• Overall AI Profile Confidence: ${profile.learningConfidence}%`);
+    if (recurringCommitments && recurringCommitments.length > 0) {
+      lines.push("\nFixed Recurring Habits & Commitments:");
+      recurringCommitments.forEach((c) => {
+        lines.push(
+          `• ${c.title} (${c.repeatRule}) - Streak: ${c.currentStreak} days`,
+        );
+      });
     }
 
     if (lines.length === 1) {
@@ -231,5 +285,5 @@ export const behavioralIntelligenceService = {
     }
 
     return lines.join("\n");
-  }
+  },
 };

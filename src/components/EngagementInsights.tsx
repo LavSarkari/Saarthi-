@@ -61,14 +61,15 @@ export default function EngagementInsights({ userId, onNavigateToBrain }: Engage
       reason: "Your optimal focus duration has decreased."
     });
   }
-  if (profile?.communicationDensity && profile.communicationDensity === "minimal") {
+  const p = profile as any;
+  if (p?.communicationDensity && p.communicationDensity === "minimal") {
     recentActions.push({
       system: "Telegram",
       action: "Reduced reminder frequency.",
       reason: "You prefer minimal, high-signal alerts."
     });
   }
-  if (profile?.motivationStyle && profile.motivationStyle === "supportive") {
+  if (p?.motivationStyle && p.motivationStyle === "supportive") {
     recentActions.push({
       system: "AI Brain",
       action: "Switched to supportive coaching.",

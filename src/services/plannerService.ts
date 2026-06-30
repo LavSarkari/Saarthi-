@@ -10,12 +10,29 @@ export interface SubtaskPlan {
   order: number;
 }
 
+export interface RecurringPlanDetails {
+  isRecurring: boolean;
+  repeatRule:
+    | "daily"
+    | "weekdays"
+    | "weekends"
+    | "weekly"
+    | "biweekly"
+    | "monthly"
+    | "yearly"
+    | "custom";
+  goalValue: number;
+  goalUnit: string;
+  completionMode: "binary" | "progress" | "timer" | "count" | "custom";
+}
+
 export interface TaskPlan {
   title: string;
   complexity: "low" | "medium" | "high";
   totalEffortMinutes: number;
   subtasks: SubtaskPlan[];
   riskFactors: string[];
+  recurringDetails?: RecurringPlanDetails;
 }
 
 export interface ReminderContext {
@@ -48,9 +65,17 @@ export class PlannerService {
   /**
    * Decomposes any qualitative commitment prompt into a structured, action-oriented plan of subtasks.
    */
-  async generateTaskPlan(commitment: string, aiClient: GoogleGenAI, aiContext?: string): Promise<TaskPlan> {
+  async generateTaskPlan(
+    commitment: string,
+    aiClient: GoogleGenAI,
+    aiContext?: string,
+  ): Promise<TaskPlan> {
     if (!commitment || commitment.trim().length === 0) {
-      throw new AppError("Commitment is empty. Cannot plan task.", "BAD_REQUEST", 400);
+      throw new AppError(
+        "Commitment is empty. Cannot plan task.",
+        "BAD_REQUEST",
+        400,
+      );
     }
 
     const defaultFallback: TaskPlan = {
@@ -58,17 +83,33 @@ export class PlannerService {
       complexity: "medium",
       totalEffortMinutes: 120,
       subtasks: [
-        { title: "Define project core requirements", estimatedMinutes: 45, order: 1 },
-        { title: "Outline main execution milestones", estimatedMinutes: 45, order: 2 },
-        { title: "Perform final review & wrap-up", estimatedMinutes: 30, order: 3 },
+        {
+          title: "Define project core requirements",
+          estimatedMinutes: 45,
+          order: 1,
+        },
+        {
+          title: "Outline main execution milestones",
+          estimatedMinutes: 45,
+          order: 2,
+        },
+        {
+          title: "Perform final review & wrap-up",
+          estimatedMinutes: 30,
+          order: 3,
+        },
       ],
-      riskFactors: ["Lack of clear starting milestones", "Over-estimating left remaining timeline"],
+      riskFactors: [
+        "Lack of clear starting milestones",
+        "Over-estimating left remaining timeline",
+      ],
     };
 
     try {
-      let instructions = "You are Saarthi, a highly strategic task planner. Decompose the user's task or academic/professional commitment into clear, action-oriented, distinct subtasks. Underestimate nothing: be realistic and time-box each subtask. Suggest 3 to 6 subtasks. Return the response strictly as a JSON object that matches the provided schema.";
+      let instructions =
+        "You are Saarthi, a highly strategic task planner. Decompose the user's task or academic/professional commitment into clear, action-oriented, distinct subtasks. Underestimate nothing: be realistic and time-box each subtask. Suggest 3 to 6 subtasks. Return the response strictly as a JSON object that matches the provided schema. IMPORTANT: Also detect if this commitment implies a recurring habit (e.g. 'read 20 pages a day', 'gym every weekday'). If it is recurring, fill out the recurringDetails object.";
       if (aiContext) {
-         instructions += `\n\nUSER BEHAVIORAL INTELLIGENCE CONTEXT:\n${aiContext}\nUse this context to adjust your time estimates, chunk sizes, and risk factors appropriately based on the user's historical performance.`;
+        instructions += `\n\nUSER BEHAVIORAL INTELLIGENCE CONTEXT:\n${aiContext}\nUse this context to adjust your time estimates, chunk sizes, and risk factors appropriately based on the user's historical performance.`;
       }
       const response = await generateContentWithRetryAndFallback(aiClient, {
         model: "gemini-3.1-flash-lite",
@@ -81,7 +122,8 @@ export class PlannerService {
             properties: {
               title: {
                 type: Type.STRING,
-                description: "A highly clear, polished visual title for the overall commitment.",
+                description:
+                  "A highly clear, polished visual title for the overall commitment.",
               },
               complexity: {
                 type: Type.STRING,
@@ -94,17 +136,20 @@ export class PlannerService {
               },
               subtasks: {
                 type: Type.ARRAY,
-                description: "The sequence of subtasks needed to complete this commitment on calendar.",
+                description:
+                  "The sequence of subtasks needed to complete this commitment on calendar.",
                 items: {
                   type: Type.OBJECT,
                   properties: {
                     title: {
                       type: Type.STRING,
-                      description: "Explicit action-oriented title of the subtask (e.g., 'Outline Chapter 1', 'Refactor database auth').",
+                      description:
+                        "Explicit action-oriented title of the subtask (e.g., 'Outline Chapter 1', 'Refactor database auth').",
                     },
                     estimatedMinutes: {
                       type: Type.INTEGER,
-                      description: "Realistic number of minutes required for this subtask (between 15 and 240).",
+                      description:
+                        "Realistic number of minutes required for this subtask (between 15 and 240).",
                     },
                     order: {
                       type: Type.INTEGER,
@@ -117,35 +162,117 @@ export class PlannerService {
               riskFactors: {
                 type: Type.ARRAY,
                 items: { type: Type.STRING },
-                description: "A few bullet points identifying pitfalls that usually cause procrastination on this specific type of task.",
+                description:
+                  "A few bullet points identifying pitfalls that usually cause procrastination on this specific type of task.",
+              },
+              recurringDetails: {
+                type: Type.OBJECT,
+                description:
+                  "If this task is a recurring habit, provide these details.",
+                properties: {
+                  isRecurring: { type: Type.BOOLEAN },
+                  repeatRule: {
+                    type: Type.STRING,
+                    enum: [
+                      "daily",
+                      "weekdays",
+                      "weekends",
+                      "weekly",
+                      "biweekly",
+                      "monthly",
+                      "yearly",
+                      "custom",
+                    ],
+                  },
+                  goalValue: {
+                    type: Type.INTEGER,
+                    description: "e.g. 4 for 4 questions",
+                  },
+                  goalUnit: {
+                    type: Type.STRING,
+                    description: "e.g. 'Questions', 'Pages'",
+                  },
+                  completionMode: {
+                    type: Type.STRING,
+                    enum: ["binary", "progress", "timer", "count", "custom"],
+                  },
+                },
+                required: [
+                  "isRecurring",
+                  "repeatRule",
+                  "goalValue",
+                  "goalUnit",
+                  "completionMode",
+                ],
               },
             },
-            required: ["title", "complexity", "totalEffortMinutes", "subtasks", "riskFactors"],
+            required: [
+              "title",
+              "complexity",
+              "totalEffortMinutes",
+              "subtasks",
+              "riskFactors",
+            ],
           },
         },
       });
 
-      const parsed = extractAndParseJson<TaskPlan>(response.text || "", defaultFallback);
+      const parsed = extractAndParseJson<TaskPlan>(
+        response.text || "",
+        defaultFallback,
+      );
 
       // Validate schema values strictly to ensure complete immunity
-      const finalTitle = (typeof parsed.title === "string" && parsed.title.trim()) ? parsed.title.trim() : defaultFallback.title;
-      const finalComplexity = ["low", "medium", "high"].includes(parsed.complexity) ? parsed.complexity : "medium";
-      const validatedSubtasks: SubtaskPlan[] = Array.isArray(parsed.subtasks) && parsed.subtasks.length > 0 
-        ? parsed.subtasks.map((s: any, i: number) => ({
-            title: (typeof s.title === "string" && s.title.trim()) ? s.title.trim() : `Milestone ${i + 1}`,
-            estimatedMinutes: (typeof s.estimatedMinutes === "number" && s.estimatedMinutes > 0) ? s.estimatedMinutes : 45,
-            order: (typeof s.order === "number") ? s.order : i + 1,
-          }))
-        : defaultFallback.subtasks;
+      const finalTitle =
+        typeof parsed.title === "string" && parsed.title.trim()
+          ? parsed.title.trim()
+          : defaultFallback.title;
+      const finalComplexity = ["low", "medium", "high"].includes(
+        parsed.complexity,
+      )
+        ? parsed.complexity
+        : "medium";
+      const validatedSubtasks: SubtaskPlan[] =
+        Array.isArray(parsed.subtasks) && parsed.subtasks.length > 0
+          ? parsed.subtasks.map((s: any, i: number) => ({
+              title:
+                typeof s.title === "string" && s.title.trim()
+                  ? s.title.trim()
+                  : `Milestone ${i + 1}`,
+              estimatedMinutes:
+                typeof s.estimatedMinutes === "number" && s.estimatedMinutes > 0
+                  ? s.estimatedMinutes
+                  : 45,
+              order: typeof s.order === "number" ? s.order : i + 1,
+            }))
+          : defaultFallback.subtasks;
 
-      const calculatedEffort = validatedSubtasks.reduce((sum, sub) => sum + sub.estimatedMinutes, 0);
-      const finalTotalEffort = typeof parsed.totalEffortMinutes === "number" && parsed.totalEffortMinutes > 0
-        ? parsed.totalEffortMinutes
-        : calculatedEffort;
+      const calculatedEffort = validatedSubtasks.reduce(
+        (sum, sub) => sum + sub.estimatedMinutes,
+        0,
+      );
+      const finalTotalEffort =
+        typeof parsed.totalEffortMinutes === "number" &&
+        parsed.totalEffortMinutes > 0
+          ? parsed.totalEffortMinutes
+          : calculatedEffort;
 
       const finalRiskFactors = Array.isArray(parsed.riskFactors)
-        ? parsed.riskFactors.map(rf => typeof rf === "string" ? rf : "Potential distraction risks")
+        ? parsed.riskFactors.map((rf) =>
+            typeof rf === "string" ? rf : "Potential distraction risks",
+          )
         : defaultFallback.riskFactors;
+
+      let finalRecurringDetails = undefined;
+      if (parsed.recurringDetails && parsed.recurringDetails.isRecurring) {
+        finalRecurringDetails = {
+          isRecurring: true,
+          repeatRule: parsed.recurringDetails.repeatRule || "daily",
+          goalValue: parsed.recurringDetails.goalValue || 1,
+          goalUnit: parsed.recurringDetails.goalUnit || "Times",
+          completionMode: parsed.recurringDetails.completionMode || "binary",
+        };
+      }
 
       return {
         title: finalTitle,
@@ -153,6 +280,7 @@ export class PlannerService {
         totalEffortMinutes: finalTotalEffort,
         subtasks: validatedSubtasks,
         riskFactors: finalRiskFactors,
+        recurringDetails: finalRecurringDetails,
       };
     } catch (error) {
       console.error("PlannerService.generateTaskPlan failed", error);
@@ -167,24 +295,26 @@ export class PlannerService {
     maxFocusDuration: number,
     preferredStartHour: number,
     preferredEndHour: number,
-    aiClient: GoogleGenAI
-  ): Promise<{ updatedTasks: Task[], insights: string[] }> {
+    aiClient: GoogleGenAI,
+  ): Promise<{ updatedTasks: Task[]; insights: string[] }> {
     // If no tasks, nothing to schedule
     if (!tasks || tasks.length === 0) return { updatedTasks: [], insights: [] };
 
-    const activeTasks = tasks.filter(t => t.subtasks.some(s => !s.done));
+    const activeTasks = tasks.filter((t) => t.subtasks.some((s) => !s.done));
     if (activeTasks.length === 0) return { updatedTasks: tasks, insights: [] };
 
     // Format input for AI
-    const tasksInput = activeTasks.map(t => ({
+    const tasksInput = activeTasks.map((t) => ({
       id: t.id,
       title: t.title,
       deadline: t.deadline,
-      subtasks: t.subtasks.filter(s => !s.done).map(s => ({
-        id: s.id,
-        title: s.title,
-        estimatedMinutes: s.estimatedMinutes
-      }))
+      subtasks: t.subtasks
+        .filter((s) => !s.done)
+        .map((s) => ({
+          id: s.id,
+          title: s.title,
+          estimatedMinutes: s.estimatedMinutes,
+        })),
     }));
 
     try {
@@ -226,7 +356,8 @@ Return a strict JSON object matching this schema:
         model: "gemini-3.1-flash-lite",
         contents: prompt,
         config: {
-          systemInstruction: "You are an intelligent adaptive scheduling engine. Follow constraints strictly and return only JSON matching the schema.",
+          systemInstruction:
+            "You are an intelligent adaptive scheduling engine. Follow constraints strictly and return only JSON matching the schema.",
           responseMimeType: "application/json",
           responseSchema: {
             type: Type.OBJECT,
@@ -247,20 +378,20 @@ Return a strict JSON object matching this schema:
                           estimatedMinutes: { type: Type.INTEGER },
                           scheduledStart: { type: Type.STRING },
                           scheduledEnd: { type: Type.STRING },
-                          adaptiveExplanation: { type: Type.STRING }
-                        }
-                      }
-                    }
-                  }
-                }
+                          adaptiveExplanation: { type: Type.STRING },
+                        },
+                      },
+                    },
+                  },
+                },
               },
               insights: {
                 type: Type.ARRAY,
-                items: { type: Type.STRING }
-              }
-            }
-          }
-        }
+                items: { type: Type.STRING },
+              },
+            },
+          },
+        },
       });
 
       let parsed;
@@ -273,22 +404,24 @@ Return a strict JSON object matching this schema:
       if (!parsed.updatedTasks) throw new Error("Invalid response schema");
 
       // Merge scheduled updates back into the original tasks
-      const mergedTasks = tasks.map(t => {
+      const mergedTasks = tasks.map((t) => {
         const update = parsed.updatedTasks.find((u: any) => u.id === t.id);
         if (update) {
           // preserve done subtasks
-          const doneSubtasks = t.subtasks.filter(s => s.done);
+          const doneSubtasks = t.subtasks.filter((s) => s.done);
           // map updated active subtasks
-          const newActiveSubtasks = update.subtasks.map((us: any, idx: number) => ({
-            id: us.id || `split_${Date.now()}_${idx}`,
-            title: us.title,
-            estimatedMinutes: us.estimatedMinutes,
-            done: false,
-            order: idx,
-            scheduledStart: us.scheduledStart,
-            scheduledEnd: us.scheduledEnd,
-            adaptiveExplanation: us.adaptiveExplanation
-          }));
+          const newActiveSubtasks = update.subtasks.map(
+            (us: any, idx: number) => ({
+              id: us.id || `split_${Date.now()}_${idx}`,
+              title: us.title,
+              estimatedMinutes: us.estimatedMinutes,
+              done: false,
+              order: idx,
+              scheduledStart: us.scheduledStart,
+              scheduledEnd: us.scheduledEnd,
+              adaptiveExplanation: us.adaptiveExplanation,
+            }),
+          );
           return { ...t, subtasks: [...doneSubtasks, ...newActiveSubtasks] };
         }
         return t;
@@ -297,7 +430,10 @@ Return a strict JSON object matching this schema:
       return { updatedTasks: mergedTasks, insights: parsed.insights || [] };
     } catch (e) {
       console.error("Adaptive scheduling failed", e);
-      return { updatedTasks: tasks, insights: ["Schedule fallback used due to optimization error."] };
+      return {
+        updatedTasks: tasks,
+        insights: ["Schedule fallback used due to optimization error."],
+      };
     }
   }
 
@@ -308,19 +444,25 @@ Return a strict JSON object matching this schema:
     title: string,
     description: string,
     deadline: string,
-    aiClient: GoogleGenAI
+    aiClient: GoogleGenAI,
   ): Promise<ReminderContext> {
     if (!title || title.trim().length === 0) {
-      throw new AppError("Task title is required to generate context advice.", "BAD_REQUEST", 400);
+      throw new AppError(
+        "Task title is required to generate context advice.",
+        "BAD_REQUEST",
+        400,
+      );
     }
 
     const defaultFallback: ReminderContext = {
-      nextLogicalStep: "Break the ice: Open your notepad and draft three bullet points about requirements.",
-      contextualAdvice: "Set up a clean, distraction-free environment. Turn off notifications and set a timer for 15 minutes of quiet focus.",
+      nextLogicalStep:
+        "Break the ice: Open your notepad and draft three bullet points about requirements.",
+      contextualAdvice:
+        "Set up a clean, distraction-free environment. Turn off notifications and set a timer for 15 minutes of quiet focus.",
       resourceSearchQueries: [
         `${title} outline template doc`,
         `${title} beginner starter guide`,
-        `avoiding procrastination on ${title}`
+        `avoiding procrastination on ${title}`,
       ],
       draftTemplate: `# Draft Plan for ${title}\n- [ ] Focus Item 1\n- [ ] Prep Session`,
     };
@@ -344,29 +486,64 @@ Return the response strictly as a JSON object matching the provided schema.`,
           responseSchema: {
             type: Type.OBJECT,
             properties: {
-              nextLogicalStep: { type: Type.STRING, description: "Extremely actionable, clear immediate next step." },
-              contextualAdvice: { type: Type.STRING, description: "Coaching words of wisdom on starting hurdles and setup advice." },
+              nextLogicalStep: {
+                type: Type.STRING,
+                description: "Extremely actionable, clear immediate next step.",
+              },
+              contextualAdvice: {
+                type: Type.STRING,
+                description:
+                  "Coaching words of wisdom on starting hurdles and setup advice.",
+              },
               resourceSearchQueries: {
                 type: Type.ARRAY,
                 items: { type: Type.STRING },
-                description: "Exactly three search query strings that lead directly to guides or materials.",
+                description:
+                  "Exactly three search query strings that lead directly to guides or materials.",
               },
-              draftTemplate: { type: Type.STRING, description: "Fully formed copyable markdown starter template." },
+              draftTemplate: {
+                type: Type.STRING,
+                description: "Fully formed copyable markdown starter template.",
+              },
             },
-            required: ["nextLogicalStep", "contextualAdvice", "resourceSearchQueries", "draftTemplate"],
+            required: [
+              "nextLogicalStep",
+              "contextualAdvice",
+              "resourceSearchQueries",
+              "draftTemplate",
+            ],
           },
         },
       });
 
-      const parsed = extractAndParseJson<ReminderContext>(response.text || "", defaultFallback);
+      const parsed = extractAndParseJson<ReminderContext>(
+        response.text || "",
+        defaultFallback,
+      );
 
       return {
-        nextLogicalStep: (typeof parsed.nextLogicalStep === "string" && parsed.nextLogicalStep.trim()) ? parsed.nextLogicalStep.trim() : defaultFallback.nextLogicalStep,
-        contextualAdvice: (typeof parsed.contextualAdvice === "string" && parsed.contextualAdvice.trim()) ? parsed.contextualAdvice.trim() : defaultFallback.contextualAdvice,
-        resourceSearchQueries: Array.isArray(parsed.resourceSearchQueries) && parsed.resourceSearchQueries.length > 0
-          ? parsed.resourceSearchQueries.map(q => typeof q === "string" ? q : "productivity guide")
-          : defaultFallback.resourceSearchQueries,
-        draftTemplate: (typeof parsed.draftTemplate === "string" && parsed.draftTemplate.trim()) ? parsed.draftTemplate.trim() : defaultFallback.draftTemplate,
+        nextLogicalStep:
+          typeof parsed.nextLogicalStep === "string" &&
+          parsed.nextLogicalStep.trim()
+            ? parsed.nextLogicalStep.trim()
+            : defaultFallback.nextLogicalStep,
+        contextualAdvice:
+          typeof parsed.contextualAdvice === "string" &&
+          parsed.contextualAdvice.trim()
+            ? parsed.contextualAdvice.trim()
+            : defaultFallback.contextualAdvice,
+        resourceSearchQueries:
+          Array.isArray(parsed.resourceSearchQueries) &&
+          parsed.resourceSearchQueries.length > 0
+            ? parsed.resourceSearchQueries.map((q) =>
+                typeof q === "string" ? q : "productivity guide",
+              )
+            : defaultFallback.resourceSearchQueries,
+        draftTemplate:
+          typeof parsed.draftTemplate === "string" &&
+          parsed.draftTemplate.trim()
+            ? parsed.draftTemplate.trim()
+            : defaultFallback.draftTemplate,
       };
     } catch (error) {
       console.error("PlannerService.generateReminderContext failed", error);
@@ -377,13 +554,22 @@ Return the response strictly as a JSON object matching the provided schema.`,
   /**
    * Analyzes an uploaded image (whiteboard, syllabus photo, project board) and extracts commitments.
    */
-  async analyzeSyllabus(imageBase64: string, mimeType: string, aiClient: GoogleGenAI): Promise<SyllabusAnalysis> {
+  async analyzeSyllabus(
+    imageBase64: string,
+    mimeType: string,
+    aiClient: GoogleGenAI,
+  ): Promise<SyllabusAnalysis> {
     if (!imageBase64 || !mimeType) {
-      throw new AppError("Base64 image data and mimeType are required for syllabus analysis.", "BAD_REQUEST", 400);
+      throw new AppError(
+        "Base64 image data and mimeType are required for syllabus analysis.",
+        "BAD_REQUEST",
+        400,
+      );
     }
 
     const defaultFallback: SyllabusAnalysis = {
-      extractedText: "Review captured whiteboard commitments and outline milestones.",
+      extractedText:
+        "Review captured whiteboard commitments and outline milestones.",
       approximateDeadline: "Friday afternoon",
       confidence: "Medium",
     };
@@ -408,21 +594,45 @@ Return the response strictly as a JSON object matching the provided schema.`,
           responseSchema: {
             type: Type.OBJECT,
             properties: {
-              extractedText: { type: Type.STRING, description: "A synthesized natural language statement of the extracted commitment." },
-              approximateDeadline: { type: Type.STRING, description: "Approximate estimated deadline if found." },
-              confidence: { type: Type.STRING, enum: ["High", "Medium", "Low"], description: "Visual extraction confidence." },
+              extractedText: {
+                type: Type.STRING,
+                description:
+                  "A synthesized natural language statement of the extracted commitment.",
+              },
+              approximateDeadline: {
+                type: Type.STRING,
+                description: "Approximate estimated deadline if found.",
+              },
+              confidence: {
+                type: Type.STRING,
+                enum: ["High", "Medium", "Low"],
+                description: "Visual extraction confidence.",
+              },
             },
             required: ["extractedText", "approximateDeadline", "confidence"],
           },
         },
       });
 
-      const parsed = extractAndParseJson<SyllabusAnalysis>(response.text || "", defaultFallback);
+      const parsed = extractAndParseJson<SyllabusAnalysis>(
+        response.text || "",
+        defaultFallback,
+      );
 
       return {
-        extractedText: (typeof parsed.extractedText === "string" && parsed.extractedText.trim()) ? parsed.extractedText : defaultFallback.extractedText,
-        approximateDeadline: (typeof parsed.approximateDeadline === "string" && parsed.approximateDeadline.trim()) ? parsed.approximateDeadline : defaultFallback.approximateDeadline,
-        confidence: ["High", "Medium", "Low"].includes(parsed.confidence) ? parsed.confidence : "Medium",
+        extractedText:
+          typeof parsed.extractedText === "string" &&
+          parsed.extractedText.trim()
+            ? parsed.extractedText
+            : defaultFallback.extractedText,
+        approximateDeadline:
+          typeof parsed.approximateDeadline === "string" &&
+          parsed.approximateDeadline.trim()
+            ? parsed.approximateDeadline
+            : defaultFallback.approximateDeadline,
+        confidence: ["High", "Medium", "Low"].includes(parsed.confidence)
+          ? parsed.confidence
+          : "Medium",
       };
     } catch (error) {
       console.error("PlannerService.analyzeSyllabus failed", error);
@@ -434,14 +644,22 @@ Return the response strictly as a JSON object matching the provided schema.`,
    * Performs high-accuracy OCR extraction of academic and professional commitments from images.
    * Leverages Gemini Vision to extract title, deadline, description, estimated effort, and confidence.
    */
-  async extractOCRCommitments(imageBase64: string, mimeType: string, aiClient: GoogleGenAI): Promise<OCRResponse> {
+  async extractOCRCommitments(
+    imageBase64: string,
+    mimeType: string,
+    aiClient: GoogleGenAI,
+  ): Promise<OCRResponse> {
     if (!imageBase64 || !mimeType) {
-      throw new AppError("Base64 image data and mimeType are required for OCR commitment extraction.", "BAD_REQUEST", 400);
+      throw new AppError(
+        "Base64 image data and mimeType are required for OCR commitment extraction.",
+        "BAD_REQUEST",
+        400,
+      );
     }
 
     const defaultFallback: OCRResponse = {
       commitments: [],
-      overallConfidence: 0
+      overallConfidence: 0,
     };
 
     try {
@@ -476,27 +694,57 @@ Return your response strictly in the JSON schema provided.`,
             properties: {
               commitments: {
                 type: Type.ARRAY,
-                description: "List of all commitments extracted from the image.",
+                description:
+                  "List of all commitments extracted from the image.",
                 items: {
                   type: Type.OBJECT,
                   properties: {
-                    title: { type: Type.STRING, description: "Crisp specific title of the commitment." },
-                    deadline: { type: Type.STRING, description: "ISO 8601 local format (YYYY-MM-DDTHH:mm)." },
-                    description: { type: Type.STRING, description: "Summary of description, requirements, or syllabus context." },
-                    estimatedMinutes: { type: Type.INTEGER, description: "Total recommended/estimated minutes for execution." },
-                    confidence: { type: Type.INTEGER, description: "Confidence score out of 100." }
+                    title: {
+                      type: Type.STRING,
+                      description: "Crisp specific title of the commitment.",
+                    },
+                    deadline: {
+                      type: Type.STRING,
+                      description: "ISO 8601 local format (YYYY-MM-DDTHH:mm).",
+                    },
+                    description: {
+                      type: Type.STRING,
+                      description:
+                        "Summary of description, requirements, or syllabus context.",
+                    },
+                    estimatedMinutes: {
+                      type: Type.INTEGER,
+                      description:
+                        "Total recommended/estimated minutes for execution.",
+                    },
+                    confidence: {
+                      type: Type.INTEGER,
+                      description: "Confidence score out of 100.",
+                    },
                   },
-                  required: ["title", "deadline", "description", "estimatedMinutes", "confidence"]
-                }
+                  required: [
+                    "title",
+                    "deadline",
+                    "description",
+                    "estimatedMinutes",
+                    "confidence",
+                  ],
+                },
               },
-              overallConfidence: { type: Type.INTEGER, description: "Overall confidence of OCR processing out of 100." }
+              overallConfidence: {
+                type: Type.INTEGER,
+                description: "Overall confidence of OCR processing out of 100.",
+              },
             },
-            required: ["commitments", "overallConfidence"]
-          }
-        }
+            required: ["commitments", "overallConfidence"],
+          },
+        },
       });
 
-      const parsed = extractAndParseJson<OCRResponse>(response.text || "", defaultFallback);
+      const parsed = extractAndParseJson<OCRResponse>(
+        response.text || "",
+        defaultFallback,
+      );
 
       // Clean up and validate extracted dates so they always match datetime-local format YYYY-MM-DDTHH:mm
       const validatedCommitments = (parsed.commitments || []).map((c: any) => {
@@ -512,17 +760,32 @@ Return your response strictly in the JSON schema provided.`,
         }
 
         return {
-          title: typeof c.title === "string" && c.title.trim() ? c.title.trim() : "Extracted Commitment",
+          title:
+            typeof c.title === "string" && c.title.trim()
+              ? c.title.trim()
+              : "Extracted Commitment",
           deadline: deadline,
-          description: typeof c.description === "string" && c.description.trim() ? c.description.trim() : "No details extracted.",
-          estimatedMinutes: typeof c.estimatedMinutes === "number" && c.estimatedMinutes > 0 ? c.estimatedMinutes : 120,
-          confidence: typeof c.confidence === "number" ? Math.max(0, Math.min(100, c.confidence)) : 80
+          description:
+            typeof c.description === "string" && c.description.trim()
+              ? c.description.trim()
+              : "No details extracted.",
+          estimatedMinutes:
+            typeof c.estimatedMinutes === "number" && c.estimatedMinutes > 0
+              ? c.estimatedMinutes
+              : 120,
+          confidence:
+            typeof c.confidence === "number"
+              ? Math.max(0, Math.min(100, c.confidence))
+              : 80,
         };
       });
 
       return {
         commitments: validatedCommitments,
-        overallConfidence: typeof parsed.overallConfidence === "number" ? Math.max(0, Math.min(100, parsed.overallConfidence)) : 80
+        overallConfidence:
+          typeof parsed.overallConfidence === "number"
+            ? Math.max(0, Math.min(100, parsed.overallConfidence))
+            : 80,
       };
     } catch (error) {
       console.error("PlannerService.extractOCRCommitments failed", error);
@@ -535,35 +798,60 @@ Return your response strictly in the JSON schema provided.`,
     hoursRemaining: number,
     totalEffortMinutes: number,
     subtasksLeftNames: string[],
-    aiClient: GoogleGenAI
-  ): Promise<{ isRecovered: boolean; situationSummary: string; messageToUser: string; advice: string }> {
+    aiClient: GoogleGenAI,
+  ): Promise<{
+    isRecovered: boolean;
+    situationSummary: string;
+    messageToUser: string;
+    advice: string;
+  }> {
     const defaultFallback = {
       isRecovered: false,
       situationSummary: "Time is critically short.",
       messageToUser: "You need to start immediately. No time for perfection.",
-      advice: "Focus only on the most critical subtasks. Drop everything else."
+      advice: "Focus only on the most critical subtasks. Drop everything else.",
     };
 
     try {
       const prompt = `Task: ${taskTitle}\nDescription: ${description || "None"}\nHours Remaining: ${hoursRemaining.toFixed(1)}\nEffort Remaining: ${totalEffortMinutes} minutes\nPending Subtasks: ${subtasksLeftNames.join(", ")}`;
-      
+
       const response = await generateContentWithRetryAndFallback(aiClient, {
         model: "gemini-3.1-pro-preview", // high-thinking strategist
         contents: prompt,
         config: {
-          systemInstruction: "You are Saarthi's Recovery Engine. The user is failing a specific task. Generate a ruthless, realistic recovery plan for this specific task. Be direct and strict.",
+          systemInstruction:
+            "You are Saarthi's Recovery Engine. The user is failing a specific task. Generate a ruthless, realistic recovery plan for this specific task. Be direct and strict.",
           responseMimeType: "application/json",
           responseSchema: {
             type: Type.OBJECT,
             properties: {
-              isRecovered: { type: Type.BOOLEAN, description: "Can this task actually be saved?" },
-              situationSummary: { type: Type.STRING, description: "A blunt 1-sentence assessment of the reality." },
-              messageToUser: { type: Type.STRING, description: "A direct, empathetic but firm message to the user." },
-              advice: { type: Type.STRING, description: "Specific tactical advice on what to cut and what to focus on." }
+              isRecovered: {
+                type: Type.BOOLEAN,
+                description: "Can this task actually be saved?",
+              },
+              situationSummary: {
+                type: Type.STRING,
+                description: "A blunt 1-sentence assessment of the reality.",
+              },
+              messageToUser: {
+                type: Type.STRING,
+                description:
+                  "A direct, empathetic but firm message to the user.",
+              },
+              advice: {
+                type: Type.STRING,
+                description:
+                  "Specific tactical advice on what to cut and what to focus on.",
+              },
             },
-            required: ["isRecovered", "situationSummary", "messageToUser", "advice"]
-          }
-        }
+            required: [
+              "isRecovered",
+              "situationSummary",
+              "messageToUser",
+              "advice",
+            ],
+          },
+        },
       });
       return extractAndParseJson(response.text || "", defaultFallback);
     } catch (e) {

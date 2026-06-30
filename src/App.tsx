@@ -41,6 +41,9 @@ import {
   MessageSquare,
   BarChart,
   Menu,
+  GripHorizontal,
+  ListTodo,
+  Flame,
 } from "lucide-react";
 import { User } from "firebase/auth";
 import {
@@ -55,10 +58,12 @@ import {
   arrayUnion,
   arrayRemove,
   setDoc,
+  writeBatch,
 } from "firebase/firestore";
 import {
   initAuth,
   googleSignIn,
+  googleSignInWithRedirect,
   logout as authLogout,
   getAccessToken,
   db,
@@ -83,12 +88,31 @@ import SyllabusAnalyzer from "./components/SyllabusAnalyzer";
 import OCRReviewModal from "./components/OCRReviewModal";
 import AssistantPanel from "./components/AssistantPanel";
 import ActivationCenter from "./components/ActivationCenter";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  rectSortingStrategy,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import EngagementInsights from "./components/EngagementInsights";
 import RecoveryCenter from "./components/RecoveryCenter";
 import CompanionCenter from "./components/CompanionCenter";
 import CompanionOnboarding from "./components/CompanionOnboarding";
 import LearningCenter from "./components/LearningCenter";
 import AdaptivePlanningCenter from "./components/AdaptivePlanningCenter";
+import RecurringCommitmentsPanel from "./components/RecurringCommitmentsPanel";
+import { recurringCommitmentService } from "./services/recurringCommitmentService";
 import { behavioralIntelligenceService } from "./services/behavioralIntelligenceService";
 import { AIErrorHandler, ParsedAIError } from "./utils/AIErrorHandler";
 import AIErrorToast from "./components/AIErrorToast";
@@ -100,10 +124,22 @@ const SYSTEM_ADMIN_EMAILS = [
   "sandbox@saarthi-platform.com",
 ];
 
+const isDailyHabit = (task: Task) => {
+  const isLabeledDaily = task.labels?.some(l => l.toLowerCase().includes("daily") || l.toLowerCase().includes("habit"));
+  if (isLabeledDaily) return true;
+  
+  if (!task.deadline) return false;
+  const deadlineDate = new Date(task.deadline);
+  const today = new Date();
+  return deadlineDate.getDate() === today.getDate() &&
+         deadlineDate.getMonth() === today.getMonth() &&
+         deadlineDate.getFullYear() === today.getFullYear();
+};
+
 async function parseApiError(
   res: Response,
   isUserApiKey: boolean,
-  model: string = 'unknown'
+  model: string = "unknown",
 ): Promise<ParsedAIError> {
   let errData: any = {};
   try {
@@ -112,14 +148,49 @@ async function parseApiError(
 
   // Some endpoints return { error: ... }
   // We can pass this to the AIErrorHandler
-  const rawError = errData.error ? errData : { message: res.statusText, status: res.status, ...errData };
+  const rawError = errData.error
+    ? errData
+    : { message: res.statusText, status: res.status, ...errData };
   if (!rawError.status) rawError.status = res.status;
 
   return AIErrorHandler.parseError(rawError, isUserApiKey, model);
 }
 
+function SortableTaskWrapper(props: { task: Task; children: React.ReactNode }) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: props.task.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 10 : 1,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} className="relative group/sortable h-full pt-3">
+      {/* Drag Handle */}
+      <div
+        {...attributes}
+        {...listeners}
+        className="absolute top-0 left-1/2 -translate-x-1/2 z-30 px-4 py-1 cursor-grab active:cursor-grabbing text-zinc-400 hover:text-zinc-600 dark:text-zinc-500 dark:hover:text-zinc-300 opacity-0 group-hover/sortable:opacity-100 transition-all bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-full shadow-sm hover:shadow-md hover:scale-105"
+        title="Drag to reorder"
+      >
+        <GripHorizontal className="w-4 h-4" />
+      </div>
+      {props.children}
+    </div>
+  );
+}
+
 export default function App() {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<any>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [needsAuth, setNeedsAuth] = useState(true);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
@@ -129,21 +200,24 @@ export default function App() {
   const [isCopilotOpen, setIsCopilotOpen] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showInitialApiPrompt, setShowInitialApiPrompt] = useState(false);
-  const [showInitialTelegramPrompt, setShowInitialTelegramPrompt] = useState(false);
-  const [hasDismissedActivationPrompt, setHasDismissedActivationPrompt] = useState(false);
+  const [showInitialTelegramPrompt, setShowInitialTelegramPrompt] =
+    useState(false);
+  const [hasDismissedActivationPrompt, setHasDismissedActivationPrompt] =
+    useState(false);
   const [companionProfile, setCompanionProfile] =
     useState<CompanionProfile | null>(null);
 
   // Task list states
   const [tasks, setTasks] = useState<Task[]>([]);
   const [tasksSortBy, setTasksSortBy] = useState<
-    "created" | "deadline" | "risk"
-  >("created");
+    "created" | "deadline" | "risk" | "manual"
+  >("manual");
   const [isTasksSortDropdownOpen, setIsTasksSortDropdownOpen] =
     useState<boolean>(false);
   const [showCompletedTasks, setShowCompletedTasks] = useState(false);
   const [tasksSearchQuery, setTasksSearchQuery] = useState("");
   const [newCommitment, setNewCommitment] = useState("");
+  const [isDailyTask, setIsDailyTask] = useState(false);
   const [customDeadline, setCustomDeadline] = useState("");
   const [isPlanning, setIsPlanning] = useState(false);
 
@@ -383,7 +457,7 @@ export default function App() {
       // we store it in localStorage so the Calendar service can use it.
       // (For production apps with backends, refresh_token should be securely stored).
       localStorage.setItem("saarthi_workspace_access_token", proxyAccessToken);
-      
+
       // Clean up URL
       window.history.replaceState({}, document.title, window.location.pathname);
     } else if (error) {
@@ -391,6 +465,73 @@ export default function App() {
       window.history.replaceState({}, document.title, window.location.pathname);
     }
   }, []);
+
+  // --- Drag and Drop ---
+  const handleDragEndForList = async (event: DragEndEvent, filteredTasks: Task[]) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      const oldIndex = filteredTasks.findIndex((t) => t.id === active.id);
+      const newIndex = filteredTasks.findIndex((t) => t.id === over.id);
+
+      const reorderedTasks = arrayMove(filteredTasks, oldIndex, newIndex);
+      
+      const newTasks = [...tasks];
+      
+      let batch = null;
+      if (user && !user.isSimulated) {
+        batch = writeBatch(db);
+      }
+
+      reorderedTasks.forEach((t, index) => {
+        const globalTask = newTasks.find(globalT => globalT.id === t.id);
+        if (globalTask && globalTask.orderIndex !== index) {
+           globalTask.orderIndex = index;
+           if (batch) {
+             const docRef = doc(db, "tasks", globalTask.id);
+             batch.update(docRef, { orderIndex: index });
+           }
+        }
+      });
+      
+      let nextAvailableIndex = reorderedTasks.length;
+      newTasks.forEach(globalT => {
+         if (!reorderedTasks.find(rt => rt.id === globalT.id)) {
+            if (globalT.orderIndex === undefined) {
+               globalT.orderIndex = nextAvailableIndex++;
+               if (batch) {
+                 const docRef = doc(db, "tasks", globalT.id);
+                 batch.update(docRef, { orderIndex: globalT.orderIndex });
+               }
+            }
+         }
+      });
+
+      setTasks(newTasks);
+      if (user) {
+         saveLocalTasks(user.uid, newTasks);
+      }
+      setTasksSortBy("manual"); 
+
+      if (batch) {
+        try {
+          await batch.commit();
+        } catch (e) {
+          console.error("Failed to sync reordered tasks to Firestore:", e);
+        }
+      }
+    }
+  };
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 5,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   // Initialize Auth state
   useEffect(() => {
@@ -441,7 +582,7 @@ export default function App() {
       behavioralIntelligenceService.trackEvent({
         userId: user.uid,
         eventType: "DASHBOARD_SESSION",
-        confidence: 100
+        confidence: 100,
       });
     }
   }, [currentView, user]);
@@ -516,6 +657,7 @@ export default function App() {
             googleTasksSynced: !!d.googleTasksSynced,
             recoveryPlan: d.recoveryPlan,
             reminderContext: d.reminderContext,
+            orderIndex: d.orderIndex,
           };
           const risk = computeRiskScore(tempTask);
           dbTasks.push({
@@ -960,9 +1102,25 @@ export default function App() {
       }
     } catch (err: any) {
       console.error("Login Error:", err);
-      setLoginErrorHint(err.message || String(err));
-      setShowSandboxForm(true);
-      triggerToast(`Authentication error: ${err.message || err}`);
+      const isPopupBlocked =
+        err.code === "auth/popup-blocked" ||
+        (err.message && err.message.includes("popup-blocked"));
+      if (isPopupBlocked) {
+        setLoginErrorHint("Popup blocked. Attempting redirect login...");
+        triggerToast("Login popup blocked. Redirecting to Google...");
+        try {
+          await googleSignInWithRedirect();
+        } catch (redirectErr: any) {
+          setLoginErrorHint(
+            "Redirect login also failed. Please open the app in a new tab to sign in with Google, or use the Sandbox Workspace below.",
+          );
+          setShowSandboxForm(true);
+        }
+      } else {
+        setLoginErrorHint(err.message || String(err));
+        triggerToast(`Authentication error: ${err.message || err}`);
+        setShowSandboxForm(true);
+      }
     } finally {
       setIsLoggingIn(false);
     }
@@ -1034,6 +1192,41 @@ export default function App() {
     if (!targetText.trim()) return;
 
     setIsPlanning(true);
+
+    if (isDailyTask && user && !user.isSimulated) {
+      triggerToast("Establishing daily commitment...");
+      try {
+        await recurringCommitmentService.createCommitment(user.uid, {
+          title: titleOverload || targetText,
+          description: targetText,
+          repeatRule: "daily",
+          goalValue: 1,
+          goalUnit: "times",
+          completionMode: "binary",
+          estimatedDurationMinutes: 15,
+        });
+
+        await behavioralIntelligenceService.trackEvent({
+          userId: user.uid,
+          eventType: "TASK_CREATED",
+          taskCategory: "Recurring",
+          confidence: 100,
+        });
+
+        setNewCommitment("");
+        setCustomDeadline("");
+        setIsDailyTask(false);
+        triggerToast("Daily commitment established! Check your dashboard.");
+        setCurrentView("workspace");
+      } catch (err) {
+        console.error("Failed to save daily commitment", err);
+        triggerToast("Failed to create daily commitment.");
+      } finally {
+        setIsPlanning(false);
+      }
+      return;
+    }
+
     triggerToast(
       "Saarthi is strategically framing your execution blueprint...",
     );
@@ -1053,8 +1246,16 @@ export default function App() {
 
       let aiContext = "";
       if (user && !user.isSimulated) {
-        const profile = await behavioralIntelligenceService.getLearningProfile(user.uid);
-        aiContext = behavioralIntelligenceService.generateAiContext(profile);
+        const profile = await behavioralIntelligenceService.getLearningProfile(
+          user.uid,
+        );
+        const recurringList = await recurringCommitmentService.getCommitments(
+          user.uid,
+        );
+        aiContext = behavioralIntelligenceService.generateAiContext(
+          profile,
+          recurringList,
+        );
       }
 
       const response = await fetch("/api/gemini/task-planner", {
@@ -1067,12 +1268,47 @@ export default function App() {
         const parsedErr = await parseApiError(
           response,
           !!userApiKey,
-          "task-planner"
+          "task-planner",
         );
         throw parsedErr;
       }
 
       const generatedData = await response.json();
+
+      if (
+        generatedData.recurringDetails?.isRecurring &&
+        user &&
+        !user.isSimulated
+      ) {
+        try {
+          await recurringCommitmentService.createCommitment(user.uid, {
+            title: titleOverload || generatedData.title || targetText,
+            description: targetText,
+            repeatRule: generatedData.recurringDetails.repeatRule,
+            goalValue: generatedData.recurringDetails.goalValue,
+            goalUnit: generatedData.recurringDetails.goalUnit,
+            completionMode: generatedData.recurringDetails.completionMode,
+            estimatedDurationMinutes: generatedData.totalEffortMinutes || 15,
+          });
+
+          await behavioralIntelligenceService.trackEvent({
+            userId: user.uid,
+            eventType: "TASK_CREATED",
+            taskCategory: "Recurring Habit",
+            confidence: 100,
+          });
+
+          setNewCommitment("");
+          setCustomDeadline("");
+          triggerToast(
+            "Recurring commitment established! Check your dashboard.",
+          );
+          setCurrentView("workspace"); // Go to dashboard to see it
+          return;
+        } catch (recurringErr: any) {
+          console.error("Failed to save recurring commitment", recurringErr);
+        }
+      }
 
       // Ensure task and subtasks remain perfectly synchronized & validated
       const subtaskArray: Subtask[] = (generatedData.subtasks || []).map(
@@ -1138,7 +1374,7 @@ export default function App() {
             userId: user!.uid,
             eventType: "TASK_CREATED",
             taskCategory: newTaskObj.title,
-            confidence: 100
+            confidence: 100,
           });
         } catch (dbErr: any) {
           console.warn(
@@ -1198,11 +1434,7 @@ export default function App() {
       });
 
       if (!res.ok) {
-        throw await parseApiError(
-          res,
-          !!userApiKey,
-          "syllabus-analyzer"
-        );
+        throw await parseApiError(res, !!userApiKey, "syllabus-analyzer");
       }
 
       const parsedResult = await res.json();
@@ -1307,8 +1539,15 @@ export default function App() {
 
         let aiContext = "";
         if (user && !user.isSimulated) {
-          const profile = await behavioralIntelligenceService.getLearningProfile(user.uid);
-          aiContext = behavioralIntelligenceService.generateAiContext(profile);
+          const profile =
+            await behavioralIntelligenceService.getLearningProfile(user.uid);
+          const recurringList = await recurringCommitmentService.getCommitments(
+            user.uid,
+          );
+          aiContext = behavioralIntelligenceService.generateAiContext(
+            profile,
+            recurringList,
+          );
         }
 
         const response = await fetch("/api/gemini/task-planner", {
@@ -1321,7 +1560,7 @@ export default function App() {
           throw await parseApiError(
             response,
             !!userApiKey,
-            "task-planner-decompose"
+            "task-planner-decompose",
           );
         }
 
@@ -1392,7 +1631,7 @@ export default function App() {
               userId: user!.uid,
               eventType: "OCR_IMPORT",
               taskCategory: newTaskObj.title,
-              confidence: 90
+              confidence: 90,
             });
           } catch (dbErr: any) {
             console.warn(
@@ -1479,7 +1718,7 @@ export default function App() {
         sessionsCompleted: finalSessionsCompleted,
         lastUpdated: Date.now(),
       });
-      
+
       const subtask = task.subtasks.find((s) => s.id === subtaskId);
       if (subtask && !subtask.done) {
         // Was just checked as done
@@ -1488,7 +1727,7 @@ export default function App() {
           eventType: "TASK_COMPLETED",
           subject: subtask.title,
           durationMinutes: subtask.estimatedMinutes,
-          confidence: 100
+          confidence: 100,
         });
       }
     } catch (err: any) {
@@ -1563,7 +1802,10 @@ export default function App() {
       const updatedTasks = prevTasks.map((t) => {
         if (t.id === taskId) {
           if (finalUpdates.isCompleted) {
-            finalUpdates.subtasks = t.subtasks.map((s) => ({ ...s, done: true }));
+            finalUpdates.subtasks = t.subtasks.map((s) => ({
+              ...s,
+              done: true,
+            }));
           }
           return { ...t, ...finalUpdates };
         }
@@ -1586,7 +1828,7 @@ export default function App() {
 
   // Delete task commitment
   const handleDeleteTask = async (taskId: string) => {
-    const taskToDelete = tasks.find(t => t.id === taskId);
+    const taskToDelete = tasks.find((t) => t.id === taskId);
     // Fast local state update
     const updatedTasks = tasks.filter((t) => t.id !== taskId);
     setTasks(updatedTasks);
@@ -1607,7 +1849,7 @@ export default function App() {
           userId: user.uid,
           eventType: "TASK_DELETED",
           subject: taskToDelete.title,
-          confidence: 100
+          confidence: 100,
         });
       }
     } catch (err) {
@@ -1647,14 +1889,14 @@ export default function App() {
         deadline: newDeadline,
       });
       triggerToast(`Deadline extended by ${days} day(s).`);
-      
+
       if (user) {
         await behavioralIntelligenceService.trackEvent({
           userId: user.uid,
           eventType: "TASK_SNOOZED",
           subject: task.title,
           metadata: { days },
-          confidence: 80
+          confidence: 80,
         });
       }
     } catch (err: any) {
@@ -1681,11 +1923,7 @@ export default function App() {
       });
 
       if (!res.ok) {
-        throw await parseApiError(
-          res,
-          !!userApiKey,
-          "reminder-context"
-        );
+        throw await parseApiError(res, !!userApiKey, "reminder-context");
       }
 
       const result = await res.json();
@@ -1742,7 +1980,8 @@ export default function App() {
 
   // Push work sessions directly to Google Calendar using cached accessToken
   const handleSyncToGoogleCalendar = async (task: Task) => {
-    const workspaceToken = localStorage.getItem("saarthi_workspace_access_token") || accessToken;
+    const workspaceToken =
+      localStorage.getItem("saarthi_workspace_access_token") || accessToken;
     if (!workspaceToken) {
       triggerToast(
         "Missing valid Workspace connection. Connect Google Workspace in Settings.",
@@ -1822,7 +2061,8 @@ export default function App() {
 
   // Push to Google Tasks using cached workspaceToken
   const handleSyncToGoogleTasks = async (task: Task) => {
-    const workspaceToken = localStorage.getItem("saarthi_workspace_access_token") || accessToken;
+    const workspaceToken =
+      localStorage.getItem("saarthi_workspace_access_token") || accessToken;
     if (!workspaceToken) {
       triggerToast(
         "Missing valid Workspace connection. Connect Google Workspace in Settings.",
@@ -1925,17 +2165,13 @@ export default function App() {
           appContext: {
             currentView,
             tasksCount: tasks.length,
-            riskTasks: tasks.filter(t => t.riskZone === 'danger').length,
-          }
+            riskTasks: tasks.filter((t) => t.riskZone === "critical").length,
+          },
         }),
       });
 
       if (!res.ok) {
-        throw await parseApiError(
-          res,
-          !!userApiKey,
-          "chat-bot"
-        );
+        throw await parseApiError(res, !!userApiKey, "chat-bot");
       }
 
       const result = await res.json();
@@ -2479,7 +2715,7 @@ export default function App() {
         userId: user.uid,
         eventType: "VOICE_CONVERSATION",
         durationMinutes: Math.max(1, Math.round(conversationDuration / 60)),
-        confidence: 100
+        confidence: 100,
       });
     }
 
@@ -3015,94 +3251,94 @@ export default function App() {
                   onClick={() => setShowUserDropdown((prev) => !prev)}
                   className="group flex items-center justify-center gap-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-all bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-700/80 pl-1 pr-2.5 py-1 rounded-full shadow-sm cursor-pointer outline-none focus:ring-2 focus:ring-zinc-200 dark:focus:ring-zinc-700"
                 >
-                {user?.photoURL ? (
-                  <img
-                    src={user.photoURL}
-                    alt="pfp"
-                    className="w-6 h-6 rounded-full shadow-sm"
-                  />
-                ) : (
-                  <div className="w-6 h-6 rounded-full bg-indigo-100 dark:bg-indigo-950/40 flex items-center justify-center text-indigo-700 dark:text-indigo-300 shadow-sm">
-                    <UserIcon className="w-3.5 h-3.5" />
-                  </div>
-                )}
+                  {user?.photoURL ? (
+                    <img
+                      src={user.photoURL}
+                      alt="pfp"
+                      className="w-6 h-6 rounded-full shadow-sm"
+                    />
+                  ) : (
+                    <div className="w-6 h-6 rounded-full bg-indigo-100 dark:bg-indigo-950/40 flex items-center justify-center text-indigo-700 dark:text-indigo-300 shadow-sm">
+                      <UserIcon className="w-3.5 h-3.5" />
+                    </div>
+                  )}
                   <ChevronDown
                     className={`w-4 h-4 text-zinc-500 transition-transform duration-300 ${
                       showUserDropdown ? "rotate-180" : ""
                     }`}
                   />
-              </button>
+                </button>
 
-              {showUserDropdown && (
-                <>
-                  <div
-                    className="fixed inset-0 z-40"
-                    onClick={() => setShowUserDropdown(false)}
-                  ></div>
-                  <div className="absolute right-0 mt-3 w-52 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl rounded-2xl shadow-xl border border-zinc-200/80 dark:border-zinc-800/80 overflow-hidden z-50 flex flex-col p-1.5 animate-in slide-in-from-top-2">
-                    <button
-                      onClick={() => {
-                        setActiveSettingsTab("api");
-                        setShowSettingsModal(true);
-                        setShowUserDropdown(false);
-                      }}
-                      className="flex items-center gap-3 px-3 py-2.5 text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-colors w-full text-left"
-                    >
-                      <Settings className="w-4 h-4 text-zinc-500" />
-                      <span>Settings</span>
-                    </button>
+                {showUserDropdown && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-40"
+                      onClick={() => setShowUserDropdown(false)}
+                    ></div>
+                    <div className="absolute right-0 mt-3 w-52 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl rounded-2xl shadow-xl border border-zinc-200/80 dark:border-zinc-800/80 overflow-hidden z-50 flex flex-col p-1.5 animate-in slide-in-from-top-2">
+                      <button
+                        onClick={() => {
+                          setActiveSettingsTab("api");
+                          setShowSettingsModal(true);
+                          setShowUserDropdown(false);
+                        }}
+                        className="flex items-center gap-3 px-3 py-2.5 text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-colors w-full text-left"
+                      >
+                        <Settings className="w-4 h-4 text-zinc-500" />
+                        <span>Settings</span>
+                      </button>
 
-                    <button
-                      onClick={() => {
-                        setActiveSettingsTab("memory");
-                        setShowSettingsModal(true);
-                        setShowUserDropdown(false);
-                      }}
-                      className="flex items-center gap-3 px-3 py-2.5 text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-colors w-full text-left"
-                    >
-                      <Brain className="w-4 h-4 text-zinc-500" />
-                      <span>AI Memory</span>
-                    </button>
+                      <button
+                        onClick={() => {
+                          setActiveSettingsTab("memory");
+                          setShowSettingsModal(true);
+                          setShowUserDropdown(false);
+                        }}
+                        className="flex items-center gap-3 px-3 py-2.5 text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-colors w-full text-left"
+                      >
+                        <Brain className="w-4 h-4 text-zinc-500" />
+                        <span>AI Memory</span>
+                      </button>
 
-                    <button
-                      onClick={() => {
-                        setTheme((prev) =>
-                          prev === "dark" ? "light" : "dark",
-                        );
-                        setShowUserDropdown(false);
-                      }}
-                      className="flex items-center gap-3 px-3 py-2.5 text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-colors w-full text-left"
-                    >
-                      {theme === "dark" ? (
-                        <>
-                          <Sun className="w-4 h-4 text-amber-500" />
-                          <span>Theme: Light</span>
-                        </>
-                      ) : (
-                        <>
-                          <Moon className="w-4 h-4 text-indigo-500" />
-                          <span>Theme: Dark</span>
-                        </>
-                      )}
-                    </button>
+                      <button
+                        onClick={() => {
+                          setTheme((prev) =>
+                            prev === "dark" ? "light" : "dark",
+                          );
+                          setShowUserDropdown(false);
+                        }}
+                        className="flex items-center gap-3 px-3 py-2.5 text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-colors w-full text-left"
+                      >
+                        {theme === "dark" ? (
+                          <>
+                            <Sun className="w-4 h-4 text-amber-500" />
+                            <span>Theme: Light</span>
+                          </>
+                        ) : (
+                          <>
+                            <Moon className="w-4 h-4 text-indigo-500" />
+                            <span>Theme: Dark</span>
+                          </>
+                        )}
+                      </button>
 
-                    <div className="h-px bg-zinc-200/80 dark:bg-zinc-800/80 my-1 mx-2" />
+                      <div className="h-px bg-zinc-200/80 dark:bg-zinc-800/80 my-1 mx-2" />
 
-                    <button
-                      onClick={() => {
-                        handleLogout();
-                        setShowUserDropdown(false);
-                      }}
-                      className="flex items-center gap-3 px-3 py-2.5 text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-xl transition-colors w-full text-left"
-                    >
-                      <LogOut className="w-4 h-4" />
-                      <span>Sign Out</span>
-                    </button>
-                  </div>
-                </>
-              )}
+                      <button
+                        onClick={() => {
+                          handleLogout();
+                          setShowUserDropdown(false);
+                        }}
+                        className="flex items-center gap-3 px-3 py-2.5 text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-xl transition-colors w-full text-left"
+                      >
+                        <LogOut className="w-4 h-4" />
+                        <span>Sign Out</span>
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
-          </div>
           </div>
         </header>
       </div>
@@ -3166,8 +3402,9 @@ export default function App() {
                       Brain Dump
                     </h2>
                     <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
-                      Capture chaotic, unstructured intentions via text, voice, or image. Let
-                      Saarthi auto-decompose and structure your timeline.
+                      Capture chaotic, unstructured intentions via text, voice,
+                      or image. Let Saarthi auto-decompose and structure your
+                      timeline.
                     </p>
                   </div>
 
@@ -3187,29 +3424,101 @@ export default function App() {
                           />
                           <div className="absolute bottom-3 right-3 flex items-center gap-2 sm:hidden">
                             <button className="p-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-full text-zinc-500 shadow-sm hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">
-                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="16"
+                                height="16"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              >
+                                <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" />
+                                <circle cx="12" cy="13" r="3" />
+                              </svg>
                             </button>
                             <button className="p-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-full text-zinc-500 shadow-sm hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">
-                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="16"
+                                height="16"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              >
+                                <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+                                <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                                <line x1="12" x2="12" y1="19" y2="22" />
+                              </svg>
                             </button>
-                            <button className="p-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-full text-zinc-500 shadow-sm hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors" onClick={() => navigator.clipboard.readText().then(t => setNewCommitment(prev => prev + t))}>
-                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg>
+                            <button
+                              className="p-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-full text-zinc-500 shadow-sm hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors"
+                              onClick={() =>
+                                navigator.clipboard
+                                  .readText()
+                                  .then((t) =>
+                                    setNewCommitment((prev) => prev + t),
+                                  )
+                              }
+                            >
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="16"
+                                height="16"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              >
+                                <rect
+                                  width="8"
+                                  height="4"
+                                  x="8"
+                                  y="2"
+                                  rx="1"
+                                  ry="1"
+                                />
+                                <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+                              </svg>
                             </button>
                           </div>
                         </div>
                       </div>
 
                       <div className="flex flex-col sm:flex-row gap-3 items-end pb-4 sm:pb-0">
-                        <div className="flex-1 w-full">
-                          <label className="block text-[10px] font-mono tracking-wider uppercase text-zinc-500 dark:text-zinc-400 mb-1.5 font-medium">
-                            Target Project Deadline
+                        <div className="flex-1 w-full space-y-3">
+                          <div>
+                            <label className="block text-[10px] font-mono tracking-wider uppercase text-zinc-500 dark:text-zinc-400 mb-1.5 font-medium">
+                              Target Project Deadline
+                            </label>
+                            <input
+                              type="datetime-local"
+                              value={customDeadline}
+                              onChange={(e) => setCustomDeadline(e.target.value)}
+                              className="w-full bg-zinc-50 dark:bg-zinc-950/25 border border-zinc-200 dark:border-zinc-800 focus:border-zinc-900 dark:focus:border-zinc-300 focus:bg-white dark:focus:bg-zinc-900 rounded-xl p-3 sm:p-2.5 text-sm sm:text-xs text-zinc-900 dark:text-zinc-100 outline-none transition-all"
+                            />
+                          </div>
+                          <label className="flex items-center gap-2 cursor-pointer group">
+                            <div className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${isDailyTask ? "bg-indigo-500 border-indigo-500 text-white" : "bg-white dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 group-hover:border-zinc-400"}`}>
+                              {isDailyTask && <Check className="w-3 h-3" />}
+                            </div>
+                            <input 
+                              type="checkbox" 
+                              className="hidden" 
+                              checked={isDailyTask} 
+                              onChange={(e) => setIsDailyTask(e.target.checked)} 
+                            />
+                            <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400 group-hover:text-zinc-900 dark:group-hover:text-zinc-200 transition-colors">
+                              Make this a daily recurring habit (Bypass AI)
+                            </span>
                           </label>
-                          <input
-                            type="datetime-local"
-                            value={customDeadline}
-                            onChange={(e) => setCustomDeadline(e.target.value)}
-                            className="w-full bg-zinc-50 dark:bg-zinc-950/25 border border-zinc-200 dark:border-zinc-800 focus:border-zinc-900 dark:focus:border-zinc-300 focus:bg-white dark:focus:bg-zinc-900 rounded-xl p-3 sm:p-2.5 text-sm sm:text-xs text-zinc-900 dark:text-zinc-100 outline-none transition-all"
-                          />
                         </div>
                         <button
                           onClick={() => handleAddCommitment()}
@@ -3310,7 +3619,8 @@ export default function App() {
 
                 // Mock friction detection: If any task is critical, or just simulate friction for the demo
                 // In a real app, this would be triggered by 'untouched for 2 hours', 'rapidly dropping confidence', etc.
-                const isFrictionDetected = criticalCount > 0 && !hasDismissedActivationPrompt;
+                const isFrictionDetected =
+                  criticalCount > 0 && !hasDismissedActivationPrompt;
 
                 if (isFrictionDetected) {
                   return (
@@ -3323,21 +3633,27 @@ export default function App() {
                         <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-zinc-900 dark:text-zinc-50 mb-3">
                           Activation Engine Triggered
                         </h2>
-                        
+
                         <div className="bg-rose-50 dark:bg-rose-950/20 rounded-xl p-4 mb-6 text-left border border-rose-100 dark:border-rose-900/30">
-                           <div className="flex items-center gap-2 mb-2">
-                             <AlertCircle className="w-4 h-4 text-rose-500 shrink-0" />
-                             <span className="text-sm font-bold text-rose-700 dark:text-rose-400">Why am I seeing this?</span>
-                           </div>
-                           <p className="text-xs text-rose-600/80 dark:text-rose-400/80 leading-relaxed">
-                             Saarthi detected high task friction. One of your critical milestones (e.g. "Finish DBMS Assignment") has been untouched for over 2 hours, and timeline pressure is building. 
-                           </p>
+                          <div className="flex items-center gap-2 mb-2">
+                            <AlertCircle className="w-4 h-4 text-rose-500 shrink-0" />
+                            <span className="text-sm font-bold text-rose-700 dark:text-rose-400">
+                              Why am I seeing this?
+                            </span>
+                          </div>
+                          <p className="text-xs text-rose-600/80 dark:text-rose-400/80 leading-relaxed">
+                            Saarthi detected high task friction. One of your
+                            critical milestones (e.g. "Finish DBMS Assignment")
+                            is exceeding optimal execution pacing, and timeline
+                            pressure is building.
+                          </p>
                         </div>
-                        
+
                         <p className="text-zinc-500 dark:text-zinc-400 mb-8 text-sm leading-relaxed">
-                          Let's bypass the mental barrier and start safely with a guided micro-mission.
+                          Let's bypass the mental barrier and start safely with
+                          a guided micro-mission.
                         </p>
-                        
+
                         <div className="flex flex-col gap-3">
                           <button
                             onClick={() => setIsActivationModalOpen(true)}
@@ -3346,9 +3662,11 @@ export default function App() {
                             Launch Activation Engine
                             <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                           </button>
-                          
+
                           <button
-                            onClick={() => setHasDismissedActivationPrompt(true)}
+                            onClick={() =>
+                              setHasDismissedActivationPrompt(true)
+                            }
                             className="w-full bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-300 font-bold py-3 sm:py-3.5 rounded-xl transition-all cursor-pointer"
                           >
                             Dismiss for now
@@ -3413,7 +3731,8 @@ export default function App() {
                 const hour = new Date().getHours();
                 let greetingWord = "Good evening";
                 if (hour >= 5 && hour < 12) greetingWord = "Good morning";
-                else if (hour >= 12 && hour < 17) greetingWord = "Good afternoon";
+                else if (hour >= 12 && hour < 17)
+                  greetingWord = "Good afternoon";
                 else if (hour >= 17 && hour < 22) greetingWord = "Good evening";
                 else greetingWord = "Late night";
 
@@ -3485,13 +3804,14 @@ export default function App() {
                 if (!telegramChatId) {
                   recommendationsList.push({
                     title: "Enable remote execution",
-                    description: "Connect Telegram to interact with your execution engine via text and voice anywhere.",
+                    description:
+                      "Connect Telegram to interact with your execution engine via text and voice anywhere.",
                     actionText: "Connect Telegram",
                     icon: MessageSquare,
                     onClick: () => {
                       setActiveSettingsTab("telegram");
                       setShowSettingsModal(true);
-                    }
+                    },
                   });
                 }
 
@@ -3652,7 +3972,9 @@ export default function App() {
                 const incompleteSorted = scoredTasks
                   .filter((t) => !t.isCompleted)
                   .sort((a, b) => {
-                    const diff = new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
+                    const diff =
+                      new Date(a.deadline).getTime() -
+                      new Date(b.deadline).getTime();
                     if (diff !== 0) return diff;
                     return a.id.localeCompare(b.id);
                   });
@@ -3667,7 +3989,8 @@ export default function App() {
                           {greetingWord}, {userName}
                         </h1>
                         <p className="text-zinc-500 dark:text-zinc-400 text-[11px] sm:text-xs">
-                          Your active execution engine for managing behavior and securing completion.
+                          Your active execution engine for managing behavior and
+                          securing completion.
                         </p>
                       </div>
                       <div className="flex items-center gap-2">
@@ -3827,7 +4150,7 @@ export default function App() {
                         View pacing analytics
                         <ChevronDown className="w-4 h-4 text-zinc-500 group-open:-rotate-180 transition-transform" />
                       </summary>
-                      
+
                       <div className="hidden sm:grid sm:grid-cols-1 md:grid-cols-3 gap-4 group-open:grid grid-cols-1 p-4 sm:p-0">
                         {/* Health banner */}
                         <div
@@ -3909,6 +4232,14 @@ export default function App() {
                         </div>
                       </div>
                     </details>
+
+                    {/* Recurring Commitments */}
+                    <div className="space-y-3">
+                      <RecurringCommitmentsPanel
+                        user={user}
+                        onSuggestAction={() => {}}
+                      />
+                    </div>
 
                     {/* 5. Upcoming Deadlines Section */}
                     {nextDeadlines.length > 0 && (
@@ -4018,48 +4349,184 @@ export default function App() {
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {[...scoredTasks]
-                          .filter(t => !t.isCompleted)
+                      {(() => {
+                        const activeGridTasks = [...scoredTasks]
+                          .filter((t) => !t.isCompleted)
                           .sort((a, b) => {
+                            if (tasksSortBy === "manual") {
+                              const orderA = a.orderIndex ?? Number.MAX_SAFE_INTEGER;
+                              const orderB = b.orderIndex ?? Number.MAX_SAFE_INTEGER;
+                              const diff = orderA - orderB;
+                              if (diff !== 0) return diff;
+                              return a.id.localeCompare(b.id);
+                            }
                             const diff = b.analysis.score - a.analysis.score;
                             if (diff !== 0) return diff;
                             return a.id.localeCompare(b.id);
-                          })
-                          .map((task) => (
-                            <TaskCard
-                              key={task.id}
-                              task={task}
-                              onToggleSubtask={handleToggleSubtask}
-                              onDeleteTask={handleDeleteTask}
-                              onUpdateTask={handleUpdateTask}
-                              onGenerateRescuePlan={handleGenerateRescuePlan}
-                              onGetReminderContext={handleGetReminderContext}
-                              onSyncGoogleCalendar={handleSyncToGoogleCalendar}
-                              onSnoozeDeadline={handleSnoozeDeadline}
-                              isGeneratingContext={
-                                generatingContextTaskId === task.id
-                              }
-                              expandedSubtask={expandedTaskId === task.id}
-                              onToggleExpandSubtask={() =>
-                                setExpandedTaskId(
-                                  expandedTaskId === task.id ? null : task.id,
-                                )
-                              }
-                              expandedReminder={
-                                expandedReminderTaskId === task.id
-                              }
-                              onToggleExpandReminder={() =>
-                                setExpandedReminderTaskId(
-                                  expandedReminderTaskId === task.id
-                                    ? null
-                                    : task.id,
-                                )
-                              }
-                              accessToken={accessToken}
-                            />
-                          ))}
-                      </div>
+                          });
+
+                        const completedGridTasks = [...scoredTasks]
+                          .filter((t) => t.isCompleted)
+                          .sort((a, b) => {
+                            if (tasksSortBy === "manual") {
+                              const orderA = a.orderIndex ?? Number.MAX_SAFE_INTEGER;
+                              const orderB = b.orderIndex ?? Number.MAX_SAFE_INTEGER;
+                              const diff = orderA - orderB;
+                              if (diff !== 0) return diff;
+                              return a.id.localeCompare(b.id);
+                            }
+                            return a.id.localeCompare(b.id);
+                          });
+
+                        const allGridTasks = [...activeGridTasks, ...completedGridTasks];
+
+                        const activeDailyGridTasks = activeGridTasks.filter(isDailyHabit);
+                        const activeRegularGridTasks = activeGridTasks.filter(t => !isDailyHabit(t));
+
+                        return (
+                          <DndContext
+                            sensors={sensors}
+                            collisionDetection={closestCenter}
+                            onDragEnd={(e) => handleDragEndForList(e, allGridTasks)}
+                          >
+                            <SortableContext items={allGridTasks.map((t) => t.id)} strategy={rectSortingStrategy}>
+                              {activeDailyGridTasks.length > 0 && (
+                                <div className="mb-8">
+                                  <h3 className="text-xs font-semibold text-zinc-800 dark:text-zinc-200 uppercase tracking-wider font-mono mb-4 flex items-center gap-2">
+                                    <Flame className="w-3.5 h-3.5 text-orange-500" />
+                                    Daily Commitments
+                                  </h3>
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    {activeDailyGridTasks.map((task) => (
+                                      <SortableTaskWrapper key={task.id} task={task}>
+                                        <TaskCard
+                                          task={task}
+                                          onToggleSubtask={handleToggleSubtask}
+                                          onDeleteTask={handleDeleteTask}
+                                          onUpdateTask={handleUpdateTask}
+                                          onGenerateRescuePlan={handleGenerateRescuePlan}
+                                          onGetReminderContext={handleGetReminderContext}
+                                          onSyncGoogleCalendar={handleSyncToGoogleCalendar}
+                                          onSnoozeDeadline={handleSnoozeDeadline}
+                                          isGeneratingContext={
+                                            generatingContextTaskId === task.id
+                                          }
+                                          expandedSubtask={expandedTaskId === task.id}
+                                          onToggleExpandSubtask={() =>
+                                            setExpandedTaskId(
+                                              expandedTaskId === task.id ? null : task.id,
+                                            )
+                                          }
+                                          expandedReminder={
+                                            expandedReminderTaskId === task.id
+                                          }
+                                          onToggleExpandReminder={() =>
+                                            setExpandedReminderTaskId(
+                                              expandedReminderTaskId === task.id
+                                                ? null
+                                                : task.id,
+                                            )
+                                          }
+                                          accessToken={accessToken}
+                                        />
+                                      </SortableTaskWrapper>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                              
+                              {activeRegularGridTasks.length > 0 && (
+                                <div className="mb-8">
+                                  <h3 className="text-xs font-semibold text-zinc-800 dark:text-zinc-200 uppercase tracking-wider font-mono mb-4 flex items-center gap-2">
+                                    <ListTodo className="w-3.5 h-3.5 text-indigo-500" />
+                                    Primary Tasks
+                                  </h3>
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    {activeRegularGridTasks.map((task) => (
+                                      <SortableTaskWrapper key={task.id} task={task}>
+                                        <TaskCard
+                                          task={task}
+                                          onToggleSubtask={handleToggleSubtask}
+                                          onDeleteTask={handleDeleteTask}
+                                          onUpdateTask={handleUpdateTask}
+                                          onGenerateRescuePlan={handleGenerateRescuePlan}
+                                          onGetReminderContext={handleGetReminderContext}
+                                          onSyncGoogleCalendar={handleSyncToGoogleCalendar}
+                                          onSnoozeDeadline={handleSnoozeDeadline}
+                                          isGeneratingContext={
+                                            generatingContextTaskId === task.id
+                                          }
+                                          expandedSubtask={expandedTaskId === task.id}
+                                          onToggleExpandSubtask={() =>
+                                            setExpandedTaskId(
+                                              expandedTaskId === task.id ? null : task.id,
+                                            )
+                                          }
+                                          expandedReminder={
+                                            expandedReminderTaskId === task.id
+                                          }
+                                          onToggleExpandReminder={() =>
+                                            setExpandedReminderTaskId(
+                                              expandedReminderTaskId === task.id
+                                                ? null
+                                                : task.id,
+                                            )
+                                          }
+                                          accessToken={accessToken}
+                                        />
+                                      </SortableTaskWrapper>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                              
+                              {completedGridTasks.length > 0 && (
+                                <div className="mt-8">
+                                  <h3 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider font-mono mb-4">
+                                    Completed
+                                  </h3>
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 opacity-60 grayscale-[30%]">
+                                    {completedGridTasks.map((task) => (
+                                      <SortableTaskWrapper key={task.id} task={task}>
+                                        <TaskCard
+                                          task={task}
+                                          onToggleSubtask={handleToggleSubtask}
+                                          onDeleteTask={handleDeleteTask}
+                                          onUpdateTask={handleUpdateTask}
+                                          onGenerateRescuePlan={handleGenerateRescuePlan}
+                                          onGetReminderContext={handleGetReminderContext}
+                                          onSyncGoogleCalendar={handleSyncToGoogleCalendar}
+                                          onSnoozeDeadline={handleSnoozeDeadline}
+                                          isGeneratingContext={
+                                            generatingContextTaskId === task.id
+                                          }
+                                          expandedSubtask={expandedTaskId === task.id}
+                                          onToggleExpandSubtask={() =>
+                                            setExpandedTaskId(
+                                              expandedTaskId === task.id ? null : task.id,
+                                            )
+                                          }
+                                          expandedReminder={
+                                            expandedReminderTaskId === task.id
+                                          }
+                                          onToggleExpandReminder={() =>
+                                            setExpandedReminderTaskId(
+                                              expandedReminderTaskId === task.id
+                                                ? null
+                                                : task.id,
+                                            )
+                                          }
+                                          accessToken={accessToken}
+                                        />
+                                      </SortableTaskWrapper>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </SortableContext>
+                          </DndContext>
+                        );
+                      })()}
                     </div>
 
                     {/* 8. Recovery Center (Shown ONLY if necessary) */}
@@ -4119,7 +4586,9 @@ export default function App() {
                                           <Markdown>{`💡 ${t.recoveryPlan.messageToUser}`}</Markdown>
                                         </div>
                                         <div className="text-zinc-600 dark:text-zinc-400 markdown-body">
-                                          <Markdown>{t.recoveryPlan.advice}</Markdown>
+                                          <Markdown>
+                                            {t.recoveryPlan.advice}
+                                          </Markdown>
                                         </div>
                                       </div>
                                     ) : (
@@ -4236,8 +4705,8 @@ export default function App() {
               className="w-full flex-grow flex"
             >
               <div className="w-full bg-white dark:bg-zinc-950 p-6 md:p-10 rounded-2xl md:rounded-3xl shadow-sm border border-zinc-200/50 dark:border-zinc-800/50 relative overflow-hidden flex flex-col min-h-full mx-4 md:mx-0">
-                <EngagementInsights 
-                  userId={user.uid} 
+                <EngagementInsights
+                  userId={user.uid}
                   onNavigateToBrain={() => {
                     setActiveSettingsTab("memory");
                     setShowSettingsModal(true);
@@ -4246,8 +4715,6 @@ export default function App() {
               </div>
             </motion.div>
           )}
-
-
 
           {currentView === "tasks" && (
             <motion.div
@@ -4298,11 +4765,13 @@ export default function App() {
                         className="flex items-center justify-between gap-3 px-3 py-2 text-sm font-medium bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg outline-none hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors shadow-sm min-w-[140px]"
                       >
                         <span className="text-zinc-700 dark:text-zinc-300">
-                          {tasksSortBy === "created"
-                            ? "Created Date"
-                            : tasksSortBy === "deadline"
-                              ? "Deadline"
-                              : "Risk Score"}
+                          {tasksSortBy === "manual"
+                            ? "Manual Order"
+                            : tasksSortBy === "created"
+                              ? "Created Date"
+                              : tasksSortBy === "deadline"
+                                ? "Deadline"
+                                : "Risk Score"}
                         </span>
                         <ChevronDown className="w-4 h-4 text-zinc-400" />
                       </button>
@@ -4313,6 +4782,15 @@ export default function App() {
                             onClick={() => setIsTasksSortDropdownOpen(false)}
                           ></div>
                           <div className="absolute right-0 mt-1 w-[140px] bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-lg z-20 py-1 overflow-hidden font-medium">
+                            <button
+                              onClick={() => {
+                                setTasksSortBy("manual");
+                                setIsTasksSortDropdownOpen(false);
+                              }}
+                              className={`w-full text-left px-3 py-2 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors ${tasksSortBy === "manual" ? "text-indigo-600 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-900/10" : "text-zinc-700 dark:text-zinc-300"}`}
+                            >
+                              Manual Order
+                            </button>
                             <button
                               onClick={() => {
                                 setTasksSortBy("created");
@@ -4431,10 +4909,8 @@ export default function App() {
                     </button>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-[repeat(auto-fit,minmax(340px,1fr))] gap-6">
-                    {tasks
-                      .filter((task) => {
-                        if (!showCompletedTasks && task.isCompleted) return false;
+                  (() => {
+                     const baseTasks = tasks.filter((task) => {
                         const matchesSearch =
                           !tasksSearchQuery ||
                           task.title
@@ -4449,10 +4925,19 @@ export default function App() {
                             task.labels?.includes(lbl),
                           );
                         return matchesSearch && matchesLabels;
-                      })
-                      .sort((a, b) => {
-                        if (tasksSortBy === "deadline") {
-                          const diff = new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
+                      });
+
+                      const sortFn = (a: Task, b: Task) => {
+                        if (tasksSortBy === "manual") {
+                          const orderA = a.orderIndex ?? Number.MAX_SAFE_INTEGER;
+                          const orderB = b.orderIndex ?? Number.MAX_SAFE_INTEGER;
+                          const diff = orderA - orderB;
+                          if (diff !== 0) return diff;
+                          return a.id.localeCompare(b.id);
+                        } else if (tasksSortBy === "deadline") {
+                          const diff =
+                            new Date(a.deadline).getTime() -
+                            new Date(b.deadline).getTime();
                           if (diff !== 0) return diff;
                           return a.id.localeCompare(b.id);
                         } else if (tasksSortBy === "risk") {
@@ -4460,43 +4945,153 @@ export default function App() {
                           if (diff !== 0) return diff;
                           return a.id.localeCompare(b.id);
                         } else {
-                          const diff = new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+                          const diff =
+                            new Date(b.createdAt).getTime() -
+                            new Date(a.createdAt).getTime();
                           if (diff !== 0) return diff;
                           return a.id.localeCompare(b.id);
                         }
-                      })
-                      .map((task) => (
-                        <TaskCard
-                          key={task.id}
-                          task={task}
-                          onToggleSubtask={handleToggleSubtask}
-                          onDeleteTask={handleDeleteTask}
-                          onUpdateTask={handleUpdateTask}
-                          onGenerateRescuePlan={handleGenerateRescuePlan}
-                          onGetReminderContext={handleGetReminderContext}
-                          onSyncGoogleCalendar={handleSyncToGoogleCalendar}
-                          onSnoozeDeadline={handleSnoozeDeadline}
-                          isGeneratingContext={
-                            generatingContextTaskId === task.id
-                          }
-                          expandedSubtask={expandedTaskId === task.id}
-                          onToggleExpandSubtask={() =>
-                            setExpandedTaskId(
-                              expandedTaskId === task.id ? null : task.id,
-                            )
-                          }
-                          expandedReminder={expandedReminderTaskId === task.id}
-                          onToggleExpandReminder={() =>
-                            setExpandedReminderTaskId(
-                              expandedReminderTaskId === task.id
-                                ? null
-                                : task.id,
-                            )
-                          }
-                          accessToken={accessToken}
-                        />
-                      ))}
-                  </div>
+                      };
+
+                      const activeViewTasks = baseTasks.filter((t) => !t.isCompleted).sort(sortFn);
+                      const completedViewTasks = baseTasks.filter((t) => t.isCompleted).sort(sortFn);
+                      const allViewTasks = [...activeViewTasks, ...completedViewTasks];
+
+                      const activeDailyViewTasks = activeViewTasks.filter(isDailyHabit);
+                      const activeRegularViewTasks = activeViewTasks.filter(t => !isDailyHabit(t));
+
+                    return (
+                      <DndContext
+                        sensors={sensors}
+                        collisionDetection={closestCenter}
+                        onDragEnd={(e) => handleDragEndForList(e, allViewTasks)}
+                      >
+                        <SortableContext items={allViewTasks.map((t) => t.id)} strategy={rectSortingStrategy}>
+                          {activeDailyViewTasks.length > 0 && (
+                            <div className="mb-8">
+                              <h3 className="text-xs font-semibold text-zinc-800 dark:text-zinc-200 uppercase tracking-wider font-mono mb-4 flex items-center gap-2">
+                                <Flame className="w-3.5 h-3.5 text-orange-500" />
+                                Daily Commitments
+                              </h3>
+                              <div className="grid grid-cols-1 md:grid-cols-[repeat(auto-fit,minmax(340px,1fr))] gap-6">
+                                {activeDailyViewTasks.map((task) => (
+                                  <SortableTaskWrapper key={task.id} task={task}>
+                                    <TaskCard
+                                      task={task}
+                                      onToggleSubtask={handleToggleSubtask}
+                                      onDeleteTask={handleDeleteTask}
+                                      onUpdateTask={handleUpdateTask}
+                                      onGenerateRescuePlan={handleGenerateRescuePlan}
+                                      onGetReminderContext={handleGetReminderContext}
+                                      onSyncGoogleCalendar={handleSyncToGoogleCalendar}
+                                      onSnoozeDeadline={handleSnoozeDeadline}
+                                      isGeneratingContext={
+                                        generatingContextTaskId === task.id
+                                      }
+                                      expandedSubtask={expandedTaskId === task.id}
+                                      onToggleExpandSubtask={() =>
+                                        setExpandedTaskId(
+                                          expandedTaskId === task.id ? null : task.id,
+                                        )
+                                      }
+                                      expandedReminder={expandedReminderTaskId === task.id}
+                                      onToggleExpandReminder={() =>
+                                        setExpandedReminderTaskId(
+                                          expandedReminderTaskId === task.id ? null : task.id,
+                                        )
+                                      }
+                                      accessToken={accessToken}
+                                    />
+                                  </SortableTaskWrapper>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {activeRegularViewTasks.length > 0 && (
+                            <div className="mb-8">
+                              <h3 className="text-xs font-semibold text-zinc-800 dark:text-zinc-200 uppercase tracking-wider font-mono mb-4 flex items-center gap-2">
+                                <ListTodo className="w-3.5 h-3.5 text-indigo-500" />
+                                Primary Tasks
+                              </h3>
+                              <div className="grid grid-cols-1 md:grid-cols-[repeat(auto-fit,minmax(340px,1fr))] gap-6">
+                                {activeRegularViewTasks.map((task) => (
+                                  <SortableTaskWrapper key={task.id} task={task}>
+                                    <TaskCard
+                                      task={task}
+                                      onToggleSubtask={handleToggleSubtask}
+                                      onDeleteTask={handleDeleteTask}
+                                      onUpdateTask={handleUpdateTask}
+                                      onGenerateRescuePlan={handleGenerateRescuePlan}
+                                      onGetReminderContext={handleGetReminderContext}
+                                      onSyncGoogleCalendar={handleSyncToGoogleCalendar}
+                                      onSnoozeDeadline={handleSnoozeDeadline}
+                                      isGeneratingContext={
+                                        generatingContextTaskId === task.id
+                                      }
+                                      expandedSubtask={expandedTaskId === task.id}
+                                      onToggleExpandSubtask={() =>
+                                        setExpandedTaskId(
+                                          expandedTaskId === task.id ? null : task.id,
+                                        )
+                                      }
+                                      expandedReminder={expandedReminderTaskId === task.id}
+                                      onToggleExpandReminder={() =>
+                                        setExpandedReminderTaskId(
+                                          expandedReminderTaskId === task.id ? null : task.id,
+                                        )
+                                      }
+                                      accessToken={accessToken}
+                                    />
+                                  </SortableTaskWrapper>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {completedViewTasks.length > 0 && (
+                            <div className="mt-8">
+                              <h3 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider font-mono mb-4">
+                                Completed
+                              </h3>
+                              <div className="grid grid-cols-1 md:grid-cols-[repeat(auto-fit,minmax(340px,1fr))] gap-6 opacity-60 grayscale-[30%]">
+                                {completedViewTasks.map((task) => (
+                                  <SortableTaskWrapper key={task.id} task={task}>
+                                    <TaskCard
+                                      task={task}
+                                      onToggleSubtask={handleToggleSubtask}
+                                      onDeleteTask={handleDeleteTask}
+                                      onUpdateTask={handleUpdateTask}
+                                      onGenerateRescuePlan={handleGenerateRescuePlan}
+                                      onGetReminderContext={handleGetReminderContext}
+                                      onSyncGoogleCalendar={handleSyncToGoogleCalendar}
+                                      onSnoozeDeadline={handleSnoozeDeadline}
+                                      isGeneratingContext={
+                                        generatingContextTaskId === task.id
+                                      }
+                                      expandedSubtask={expandedTaskId === task.id}
+                                      onToggleExpandSubtask={() =>
+                                        setExpandedTaskId(
+                                          expandedTaskId === task.id ? null : task.id,
+                                        )
+                                      }
+                                      expandedReminder={expandedReminderTaskId === task.id}
+                                      onToggleExpandReminder={() =>
+                                        setExpandedReminderTaskId(
+                                          expandedReminderTaskId === task.id ? null : task.id,
+                                        )
+                                      }
+                                      accessToken={accessToken}
+                                    />
+                                  </SortableTaskWrapper>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </SortableContext>
+                      </DndContext>
+                    );
+                  })()
                 )}
               </div>
             </motion.div>
@@ -4505,126 +5100,124 @@ export default function App() {
       </main>
 
       {/* Mobile Nav Floating Dock (Ultra-modern Capsule) */}
-      {currentView !== "landing" && (
-        <div className="md:hidden fixed bottom-4 left-4 right-4 z-[60] bg-white/80 dark:bg-zinc-900/80 backdrop-blur-2xl p-1.5 rounded-[32px] border border-zinc-200/50 dark:border-zinc-800/50 shadow-[0_8px_32px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.4)] flex items-center justify-between gap-1">
-          {[
-            { id: "workspace", icon: Activity, label: "Home" },
-            { id: "tasks", icon: CheckSquare, label: "Execution" },
-            { id: "planner", icon: Plus, label: "Brain Dump" },
-            { id: "engagement", icon: BarChart, label: "Behavior" },
-            { id: "more", icon: Menu, label: "More" },
-          ].map((tab) => {
-            const isActive = tab.id !== "more" ? currentView === tab.id : false;
-            const Icon = tab.icon;
-            
-            const handleClick = () => {
-              if (tab.id === "more") {
-                setShowMobileMoreMenu(true);
-              } else {
-                setCurrentView(tab.id as any);
-              }
-            };
+      <div className="md:hidden fixed bottom-4 left-4 right-4 z-[60] bg-white/80 dark:bg-zinc-900/80 backdrop-blur-2xl p-1.5 rounded-[32px] border border-zinc-200/50 dark:border-zinc-800/50 shadow-[0_8px_32px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.4)] flex items-center justify-between gap-1">
+        {[
+          { id: "workspace", icon: Activity, label: "Home" },
+          { id: "tasks", icon: CheckSquare, label: "Execution" },
+          { id: "planner", icon: Plus, label: "Brain Dump" },
+          { id: "engagement", icon: BarChart, label: "Behavior" },
+          { id: "more", icon: Menu, label: "More" },
+        ].map((tab) => {
+          const isActive = tab.id !== "more" ? currentView === tab.id : false;
+          const Icon = tab.icon;
 
-            return (
-              <button
-                key={tab.id}
-                onClick={handleClick}
-                className={`relative flex-1 h-14 flex flex-col items-center justify-center rounded-[24px] transition-all outline-none focus:outline-none ${
-                  isActive
-                    ? "text-zinc-900 dark:text-zinc-100"
-                    : "text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300"
-                }`}
-              >
-                {isActive && (
-                  <motion.div
-                    layoutId="mobileNavIndicator"
-                    className="absolute inset-0 bg-white dark:bg-zinc-800 shadow-[0_2px_8px_rgba(0,0,0,0.08)] border border-zinc-200/40 dark:border-zinc-700/60 rounded-[24px] -z-10"
-                  />
-                )}
-                <Icon
-                  className={`w-5 h-5 mb-1 transition-transform ${isActive ? "scale-110" : ""}`}
+          const handleClick = () => {
+            if (tab.id === "more") {
+              setShowMobileMoreMenu(true);
+            } else {
+              setCurrentView(tab.id as any);
+            }
+          };
+
+          return (
+            <button
+              key={tab.id}
+              onClick={handleClick}
+              className={`relative flex-1 h-14 flex flex-col items-center justify-center rounded-[24px] transition-all outline-none focus:outline-none ${
+                isActive
+                  ? "text-zinc-900 dark:text-zinc-100"
+                  : "text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300"
+              }`}
+            >
+              {isActive && (
+                <motion.div
+                  layoutId="mobileNavIndicator"
+                  className="absolute inset-0 bg-white dark:bg-zinc-800 shadow-[0_2px_8px_rgba(0,0,0,0.08)] border border-zinc-200/40 dark:border-zinc-700/60 rounded-[24px] -z-10"
                 />
-                <span className="text-[10px] font-medium leading-none">{tab.label}</span>
-              </button>
-            );
-          })}
-        </div>
-      )}
+              )}
+              <Icon
+                className={`w-5 h-5 mb-1 transition-transform ${isActive ? "scale-110" : ""}`}
+              />
+              <span className="text-[10px] font-medium leading-none">
+                {tab.label}
+              </span>
+            </button>
+          );
+        })}
+      </div>
 
       {/* Floating Copilot Widget */}
-      {currentView !== "landing" && (
-        <div className="fixed bottom-[96px] md:bottom-8 right-4 md:right-6 z-[70] flex flex-col items-end gap-4 pointer-events-none">
-          {isCopilotOpen && (
-            <div className="w-[380px] max-w-[calc(100vw-32px)] h-[600px] max-h-[calc(100vh-140px)] md:max-h-[70vh] flex flex-col bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl border border-zinc-200/80 dark:border-zinc-800/80 rounded-3xl shadow-[0_20px_60px_-15px_rgba(0,0,0,0.2)] relative overflow-hidden transition-all animate-in zoom-in-95 pointer-events-auto origin-bottom-right">
-              <AssistantPanel
-                activeTab={activeTab}
-                setActiveTab={setActiveTab}
-                chatPersona={chatPersona}
-                setChatPersona={setChatPersona}
-                enableGrounding={enableGrounding}
-                setEnableGrounding={setEnableGrounding}
-                enableThinking={enableThinking}
-                setEnableThinking={setEnableThinking}
-                chats={chats}
-                chatInput={chatInput}
-                setChatInput={setChatInput}
-                isChatSending={isChatSending}
-                chatSources={chatSources}
-                onSendChatMessage={handleSendChatMessage}
-                isLiveActive={isLiveActive}
-                liveLog={liveLog}
-                onStartLiveCall={handleStartLiveCall}
-                imagePrompt={imagePrompt}
-                setImagePrompt={setImagePrompt}
-                imageSize={imageSize}
-                setImageSize={setImageSize}
-                isGeneratingImg={isGeneratingImg}
-                onGeneratePoster={handleGeneratePoster}
-                generatedImg={generatedImg}
-                triggerToast={triggerToast}
-                liveState={liveState}
-                liveErrorMessage={liveErrorMessage}
-                userTranscript={userTranscript}
-                modelTranscript={modelTranscript}
-                micVolume={micVolume}
-                playbackVolume={playbackVolume}
-                isMuted={isMuted}
-                onToggleMute={handleToggleMute}
-                latencyMs={latencyMs}
-                connectionQuality={connectionQuality}
-                conversationDuration={conversationDuration}
-                availableMics={availableMics}
-                availableSpeakers={availableSpeakers}
-                selectedMicId={selectedMicId}
-                selectedSpeakerId={selectedSpeakerId}
-                onSelectMic={handleSelectMic}
-                onSelectSpeaker={handleSelectSpeaker}
-              />
-            </div>
+      <div className="fixed bottom-[96px] md:bottom-8 right-4 md:right-6 z-[70] flex flex-col items-end gap-4 pointer-events-none">
+        {isCopilotOpen && (
+          <div className="w-[380px] max-w-[calc(100vw-32px)] h-[600px] max-h-[calc(100vh-140px)] md:max-h-[70vh] flex flex-col bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl border border-zinc-200/80 dark:border-zinc-800/80 rounded-3xl shadow-[0_20px_60px_-15px_rgba(0,0,0,0.2)] relative overflow-hidden transition-all animate-in zoom-in-95 pointer-events-auto origin-bottom-right">
+            <AssistantPanel
+              activeTab={activeTab}
+              setActiveTab={setActiveTab}
+              chatPersona={chatPersona}
+              setChatPersona={setChatPersona}
+              enableGrounding={enableGrounding}
+              setEnableGrounding={setEnableGrounding}
+              enableThinking={enableThinking}
+              setEnableThinking={setEnableThinking}
+              chats={chats}
+              chatInput={chatInput}
+              setChatInput={setChatInput}
+              isChatSending={isChatSending}
+              chatSources={chatSources}
+              onSendChatMessage={handleSendChatMessage}
+              isLiveActive={isLiveActive}
+              liveLog={liveLog}
+              onStartLiveCall={handleStartLiveCall}
+              imagePrompt={imagePrompt}
+              setImagePrompt={setImagePrompt}
+              imageSize={imageSize}
+              setImageSize={setImageSize}
+              isGeneratingImg={isGeneratingImg}
+              onGeneratePoster={handleGeneratePoster}
+              generatedImg={generatedImg}
+              triggerToast={triggerToast}
+              liveState={liveState}
+              liveErrorMessage={liveErrorMessage}
+              userTranscript={userTranscript}
+              modelTranscript={modelTranscript}
+              micVolume={micVolume}
+              playbackVolume={playbackVolume}
+              isMuted={isMuted}
+              onToggleMute={handleToggleMute}
+              latencyMs={latencyMs}
+              connectionQuality={connectionQuality}
+              conversationDuration={conversationDuration}
+              availableMics={availableMics}
+              availableSpeakers={availableSpeakers}
+              selectedMicId={selectedMicId}
+              selectedSpeakerId={selectedSpeakerId}
+              onSelectMic={handleSelectMic}
+              onSelectSpeaker={handleSelectSpeaker}
+            />
+          </div>
+        )}
+        <button
+          onClick={() => setIsCopilotOpen(!isCopilotOpen)}
+          className={`md:h-12 md:w-auto md:px-5 h-12 px-4 rounded-full shadow-lg backdrop-blur-xl transition-all flex items-center justify-center gap-2.5 pointer-events-auto group overflow-hidden border ${
+            isCopilotOpen
+              ? "bg-zinc-200/80 dark:bg-zinc-800/80 text-zinc-900 dark:text-zinc-100 border-zinc-300/50 dark:border-zinc-700/50 hover:bg-zinc-300 dark:hover:bg-zinc-700"
+              : "bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 border-zinc-800 dark:border-zinc-200 shadow-xl hover:scale-105 active:scale-95"
+          }`}
+        >
+          {isCopilotOpen ? (
+            <X className="w-5 h-5 transition-transform group-hover:rotate-90 shrink-0" />
+          ) : (
+            <>
+              <div className="relative flex items-center justify-center shrink-0">
+                <Sparkles className="w-4 h-4 text-white dark:text-zinc-900 relative z-10 transition-transform group-hover:scale-110" />
+              </div>
+              <span className="font-bold tracking-tight text-sm text-white dark:text-zinc-900">
+                Saarthi AI
+              </span>
+            </>
           )}
-          <button
-            onClick={() => setIsCopilotOpen(!isCopilotOpen)}
-            className={`md:h-12 md:w-auto md:px-5 h-12 px-4 rounded-full shadow-lg backdrop-blur-xl transition-all flex items-center justify-center gap-2.5 pointer-events-auto group overflow-hidden border ${
-              isCopilotOpen
-                ? "bg-zinc-200/80 dark:bg-zinc-800/80 text-zinc-900 dark:text-zinc-100 border-zinc-300/50 dark:border-zinc-700/50 hover:bg-zinc-300 dark:hover:bg-zinc-700"
-                : "bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 border-zinc-800 dark:border-zinc-200 shadow-xl hover:scale-105 active:scale-95"
-            }`}
-          >
-            {isCopilotOpen ? (
-              <X className="w-5 h-5 transition-transform group-hover:rotate-90 shrink-0" />
-            ) : (
-              <>
-                <div className="relative flex items-center justify-center shrink-0">
-                  <Sparkles className="w-4 h-4 text-white dark:text-zinc-900 relative z-10 transition-transform group-hover:scale-110" />
-                </div>
-                <span className="font-bold tracking-tight text-sm text-white dark:text-zinc-900">
-                  Saarthi AI
-                </span>
-              </>
-            )}
-          </button>
-        </div>
-      )}
+        </button>
+      </div>
 
       <SettingsModal
         isOpen={showSettingsModal}
@@ -4737,7 +5330,9 @@ export default function App() {
                     updatedTasks.forEach((t) => {
                       handleUpdateTask(t.id, { subtasks: t.subtasks });
                     });
-                    triggerToast("Schedule optimally regenerated based on behavior.");
+                    triggerToast(
+                      "Schedule optimally regenerated based on behavior.",
+                    );
                     setIsAdaptiveModalOpen(false);
                   }}
                 />
@@ -4752,13 +5347,15 @@ export default function App() {
           userId={user.uid}
           onComplete={(profile) => {
             setShowOnboarding(false);
-            handleUpdateCompanionProfile(profile).then(() => {
-              if (!userApiKey) {
-                setShowInitialApiPrompt(true);
-              } else if (!telegramChatId) {
-                setShowInitialTelegramPrompt(true);
-              }
-            }).catch(console.error);
+            handleUpdateCompanionProfile(profile)
+              .then(() => {
+                if (!userApiKey) {
+                  setShowInitialApiPrompt(true);
+                } else if (!telegramChatId) {
+                  setShowInitialTelegramPrompt(true);
+                }
+              })
+              .catch(console.error);
           }}
         />
       )}
@@ -4784,7 +5381,7 @@ export default function App() {
               <div className="flex-shrink-0 flex justify-center pt-3 pb-2">
                 <div className="w-12 h-1.5 bg-zinc-200 dark:bg-zinc-800 rounded-full" />
               </div>
-              
+
               <div className="px-6 pb-4 flex items-center gap-3">
                 {user?.photoURL ? (
                   <img
@@ -4798,22 +5395,36 @@ export default function App() {
                   </div>
                 )}
                 <div>
-                  <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">{user?.displayName || "Warrior"}</h3>
+                  <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">
+                    {user?.displayName || "Warrior"}
+                  </h3>
                   <p className="text-xs text-zinc-500">{user?.email}</p>
                 </div>
               </div>
 
               <div className="flex-1 overflow-y-auto px-4 pb-8 space-y-2">
                 {[
-                  { id: "settings", icon: Settings, label: "Settings", desc: "App & AI Configuration", onClick: () => {
-                    setActiveSettingsTab("api");
-                    setShowSettingsModal(true);
-                    setShowMobileMoreMenu(false);
-                  } },
-                  { id: "theme", icon: theme === "dark" ? Sun : Moon, label: "Theme", desc: "Toggle visual style", onClick: () => {
-                    setTheme((prev) => prev === "dark" ? "light" : "dark");
-                    setShowMobileMoreMenu(false);
-                  } },
+                  {
+                    id: "settings",
+                    icon: Settings,
+                    label: "Settings",
+                    desc: "App & AI Configuration",
+                    onClick: () => {
+                      setActiveSettingsTab("api");
+                      setShowSettingsModal(true);
+                      setShowMobileMoreMenu(false);
+                    },
+                  },
+                  {
+                    id: "theme",
+                    icon: theme === "dark" ? Sun : Moon,
+                    label: "Theme",
+                    desc: "Toggle visual style",
+                    onClick: () => {
+                      setTheme((prev) => (prev === "dark" ? "light" : "dark"));
+                      setShowMobileMoreMenu(false);
+                    },
+                  },
                 ].map((item) => (
                   <button
                     key={item.id}
@@ -4824,8 +5435,12 @@ export default function App() {
                       <item.icon className="w-5 h-5 text-zinc-700 dark:text-zinc-300" />
                     </div>
                     <div>
-                      <div className="font-bold text-zinc-900 dark:text-zinc-100">{item.label}</div>
-                      <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">{item.desc}</div>
+                      <div className="font-bold text-zinc-900 dark:text-zinc-100">
+                        {item.label}
+                      </div>
+                      <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                        {item.desc}
+                      </div>
                     </div>
                   </button>
                 ))}
@@ -4840,7 +5455,9 @@ export default function App() {
                   <div className="w-10 h-10 rounded-xl bg-white dark:bg-zinc-800 flex items-center justify-center shadow-sm">
                     <LogOut className="w-5 h-5 text-red-600 dark:text-red-400" />
                   </div>
-                  <div className="font-bold text-red-600 dark:text-red-400">Sign Out</div>
+                  <div className="font-bold text-red-600 dark:text-red-400">
+                    Sign Out
+                  </div>
                 </button>
               </div>
             </motion.div>
@@ -4861,7 +5478,9 @@ export default function App() {
                 onClick={() => {
                   setShowInitialApiPrompt(false);
                   if (!telegramChatId) setShowInitialTelegramPrompt(true);
-                  triggerToast("You can configure your API key later in Settings.");
+                  triggerToast(
+                    "You can configure your API key later in Settings.",
+                  );
                 }}
                 className="absolute top-4 right-4 p-2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 bg-zinc-100 dark:bg-zinc-800 rounded-full transition-colors z-10 cursor-pointer"
               >
@@ -4876,7 +5495,9 @@ export default function App() {
                   Connect AI Engine
                 </h2>
                 <p className="text-zinc-500 dark:text-zinc-400 text-sm mb-6 leading-relaxed">
-                  Saarthi requires a Gemini API key to power its strategic planning and recovery features. Your key is stored securely in your browser and Firebase.
+                  Saarthi requires a Gemini API key to power its strategic
+                  planning and recovery features. Your key is stored securely in
+                  your browser and Firebase.
                 </p>
 
                 <div className="space-y-4">
@@ -4899,7 +5520,12 @@ export default function App() {
                   >
                     Save API Key
                   </button>
-                  <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="block text-center text-xs text-indigo-600 dark:text-indigo-400 hover:underline">
+                  <a
+                    href="https://aistudio.google.com/app/apikey"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="block text-center text-xs text-indigo-600 dark:text-indigo-400 hover:underline"
+                  >
                     Get a Gemini API Key (Free)
                   </a>
                 </div>
@@ -4936,7 +5562,9 @@ export default function App() {
                   Telegram Companion
                 </h2>
                 <p className="text-zinc-500 dark:text-zinc-400 text-sm mb-6 leading-relaxed">
-                  Would you like to integrate Telegram? This enables real-time execution accountability, morning briefings, and remote task creation.
+                  Would you like to integrate Telegram? This enables real-time
+                  execution accountability, morning briefings, and remote task
+                  creation.
                 </p>
 
                 <div className="space-y-3">
@@ -4953,7 +5581,9 @@ export default function App() {
                   <button
                     onClick={() => {
                       setShowInitialTelegramPrompt(false);
-                      triggerToast("You can configure Telegram later in Settings.");
+                      triggerToast(
+                        "You can configure Telegram later in Settings.",
+                      );
                     }}
                     className="w-full bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-bold py-3 rounded-xl transition-all cursor-pointer"
                   >

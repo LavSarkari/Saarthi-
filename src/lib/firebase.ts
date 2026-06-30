@@ -1,6 +1,29 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, User, AuthProvider } from "firebase/auth";
-import { getFirestore, collection, doc, setDoc, getDocs, getDoc, updateDoc, deleteDoc, addDoc, query, where, orderBy, onSnapshot } from "firebase/firestore";
+import {
+  getAuth,
+  signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
+  GoogleAuthProvider,
+  onAuthStateChanged,
+  User,
+  AuthProvider,
+} from "firebase/auth";
+import {
+  getFirestore,
+  collection,
+  doc,
+  setDoc,
+  getDocs,
+  getDoc,
+  updateDoc,
+  deleteDoc,
+  addDoc,
+  query,
+  where,
+  orderBy,
+  onSnapshot,
+} from "firebase/firestore";
 import firebaseConfig from "../../firebase-applet-config.json";
 
 // Initialize Firebase App
@@ -21,13 +44,34 @@ let cachedAccessToken: string | null = null;
 
 export const initAuth = (
   onAuthSuccess?: (user: User, token: string) => void,
-  onAuthFailure?: () => void
+  onAuthFailure?: () => void,
 ) => {
+  // Check for redirect result first
+  getRedirectResult(auth)
+    .then((result) => {
+      if (result) {
+        const credential = GoogleAuthProvider.credentialFromResult(result);
+        if (credential?.accessToken) {
+          cachedAccessToken = credential.accessToken;
+        }
+        if (onAuthSuccess && result.user && cachedAccessToken) {
+          onAuthSuccess(result.user, cachedAccessToken);
+        }
+      }
+    })
+    .catch((error) => {
+      console.error("Firebase Redirect Error:", error);
+    });
+
   return onAuthStateChanged(auth, async (user: User | null) => {
     if (user) {
       if (cachedAccessToken) {
         if (onAuthSuccess) onAuthSuccess(user, cachedAccessToken);
       } else if (!isSigningIn) {
+        // We might be waiting for getRedirectResult, so we don't immediately fail.
+        // If they need a fresh token, they will have to click login again.
+        // We will call onAuthFailure here so the app knows it needs to show the login screen,
+        // BUT if getRedirectResult resolves right after, it will call onAuthSuccess!
         cachedAccessToken = null;
         if (onAuthFailure) onAuthFailure();
       }
@@ -38,13 +82,18 @@ export const initAuth = (
   });
 };
 
-export const googleSignIn = async (): Promise<{ user: User; accessToken: string } | null> => {
+export const googleSignIn = async (): Promise<{
+  user: User;
+  accessToken: string;
+} | null> => {
   try {
     isSigningIn = true;
     const result = await signInWithPopup(auth, provider);
     const credential = GoogleAuthProvider.credentialFromResult(result);
     if (!credential?.accessToken) {
-      throw new Error("Failed to get Google OAuth access token from Firebase auth.");
+      throw new Error(
+        "Failed to get Google OAuth access token from Firebase auth.",
+      );
     }
     cachedAccessToken = credential.accessToken;
     return { user: result.user, accessToken: cachedAccessToken };
@@ -54,6 +103,11 @@ export const googleSignIn = async (): Promise<{ user: User; accessToken: string 
   } finally {
     isSigningIn = false;
   }
+};
+
+export const googleSignInWithRedirect = async (): Promise<void> => {
+  isSigningIn = true;
+  await signInWithRedirect(auth, provider);
 };
 
 export const getAccessToken = async (): Promise<string | null> => {

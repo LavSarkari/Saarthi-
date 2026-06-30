@@ -133,7 +133,29 @@ export default function TaskCard({
   };
 
   const currentZone = zoneConfig[task.riskZone as keyof typeof zoneConfig] || zoneConfig["safe"];
-  const ZoneIcon = currentZone.icon;
+  
+  const isDailyHabit = (() => {
+    const isLabeledDaily = task.labels?.some(l => l.toLowerCase().includes("daily") || l.toLowerCase().includes("habit"));
+    if (isLabeledDaily) return true;
+    
+    if (!task.deadline) return false;
+    const deadlineDate = new Date(task.deadline);
+    const today = new Date();
+    return deadlineDate.getDate() === today.getDate() &&
+           deadlineDate.getMonth() === today.getMonth() &&
+           deadlineDate.getFullYear() === today.getFullYear();
+  })();
+
+  const activeZone = isDailyHabit ? {
+    ...currentZone,
+    border: "border-orange-200/80 dark:border-orange-900/40",
+    accentLine: "bg-gradient-to-b from-orange-400 to-rose-500",
+    badgeBg: "bg-orange-50 text-orange-700 dark:bg-orange-950/30 dark:text-orange-400 border-orange-100 dark:border-orange-900/30",
+    badgeText: "Daily Habit",
+    icon: Zap
+  } : currentZone;
+
+  const ZoneIcon = activeZone.icon;
 
   const handleCopyTemplate = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -143,7 +165,7 @@ export default function TaskCard({
 
   return (
     <div
-      className={`bg-white dark:bg-zinc-900 border ${currentZone.border} rounded-[20px] sm:rounded-2xl p-4 sm:p-5 shadow-xs hover:shadow-sm transition-all flex flex-col gap-3 sm:gap-4.5 relative overflow-hidden break-inside-avoid mb-4 w-full cursor-pointer sm:cursor-default`}
+      className={`bg-white dark:bg-zinc-900 border ${activeZone.border} rounded-[20px] sm:rounded-2xl p-4 sm:p-5 shadow-xs hover:shadow-sm transition-all flex flex-col gap-3 sm:gap-4.5 relative overflow-hidden break-inside-avoid mb-4 w-full cursor-pointer sm:cursor-default`}
       onClick={(e) => {
         if ((e.target as HTMLElement).closest('button, input, textarea, a')) {
           return;
@@ -154,15 +176,15 @@ export default function TaskCard({
       }}
     >
       {/* Decorative premium accent indicator */}
-      <div className={`absolute top-0 left-0 w-1.5 h-full ${currentZone.accentLine}`} />
+      <div className={`absolute top-0 left-0 w-1.5 h-full ${activeZone.accentLine}`} />
 
       {/* Top Header Row */}
       <div className="flex items-start justify-between gap-4 pl-1.5">
         <div className="space-y-1 flex-1">
           <div className="flex flex-wrap items-center gap-1.5 mb-1 sm:mb-1.5">
-            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md sm:rounded-lg text-[10px] sm:text-[11px] font-bold sm:font-medium border ${currentZone.badgeBg}`}>
+            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md sm:rounded-lg text-[10px] sm:text-[11px] font-bold sm:font-medium border ${activeZone.badgeBg}`}>
               <ZoneIcon className="w-3 h-3" />
-              {currentZone.badgeText}
+              {activeZone.badgeText}
             </span>
 
             <span className="hidden sm:inline-flex items-center px-2 py-0.5 bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700/60 text-zinc-500 dark:text-zinc-400 text-[10px] font-medium rounded-md">
