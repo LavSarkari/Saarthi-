@@ -1,7 +1,5 @@
 <div align="center">
 
-<img src="assets/saarthi-banner.png" alt="Saarthi Banner" width="100%" />
-
 # 🧭 Saarthi — सारथी
 
 ### The AI Execution Operating System for Ambitious Knowledge Workers
@@ -18,10 +16,6 @@
 [![Firebase](https://img.shields.io/badge/Firebase-12-FFCA28?style=for-the-badge&logo=firebase&logoColor=black)](https://firebase.google.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-A855F7?style=for-the-badge)](LICENSE)
 [![PRs Welcome](https://img.shields.io/badge/PRs-Welcome-22C55E?style=for-the-badge)](CONTRIBUTING.md)
-
-<br/>
-
-[🚀 Live Demo](#) · [📖 Documentation](docs/) · [🐛 Report Bug](../../issues) · [💡 Request Feature](../../issues)
 
 <br/>
 
