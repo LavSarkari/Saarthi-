@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 
 const DB_PATH = path.join(process.cwd(), "data", "local_db.json");
+const TEMP_DB_PATH = path.join(process.cwd(), "data", "local_db.json.tmp");
 
 // Ensure data directory exists
 const dir = path.dirname(DB_PATH);
@@ -21,27 +22,65 @@ export let dbData: LocalDb = {
   tasks: {}
 };
 
-// Load existing data from file if present
-if (fs.existsSync(DB_PATH)) {
-  try {
-    const raw = fs.readFileSync(DB_PATH, "utf8");
-    if (raw && raw.trim().length > 0) {
-      dbData = JSON.parse(raw);
+function sanitizeDbStructure(rawObj: any): LocalDb {
+  if (!rawObj || typeof rawObj !== "object" || Array.isArray(rawObj)) {
+    return { userSettings: {}, telegramLinks: {}, tasks: {} };
+  }
+  return {
+    userSettings: rawObj.userSettings && typeof rawObj.userSettings === "object" ? rawObj.userSettings : {},
+    telegramLinks: rawObj.telegramLinks && typeof rawObj.telegramLinks === "object" ? rawObj.telegramLinks : {},
+    tasks: rawObj.tasks && typeof rawObj.tasks === "object" ? rawObj.tasks : {}
+  };
+}
+
+/**
+ * Safely loads DB from file.
+ * Handles corrupt JSON by creating a timestamped backup before initializing safe defaults.
+ */
+export function loadDb() {
+  if (fs.existsSync(DB_PATH)) {
+    try {
+      const raw = fs.readFileSync(DB_PATH, "utf8");
+      if (raw && raw.trim().length > 0) {
+        const parsed = JSON.parse(raw);
+        dbData = sanitizeDbStructure(parsed);
+      } else {
+        dbData = { userSettings: {}, telegramLinks: {}, tasks: {} };
+      }
+    } catch (e) {
+      console.error("Error reading/parsing local DB file. Preserving corrupt snapshot:", e);
+      try {
+        const backupPath = `${DB_PATH}.corrupt.${Date.now()}`;
+        fs.copyFileSync(DB_PATH, backupPath);
+        console.warn(`Corrupt database backed up to: ${backupPath}`);
+      } catch (backupErr) {
+        console.error("Failed to create corrupt DB backup:", backupErr);
+      }
+      dbData = { userSettings: {}, telegramLinks: {}, tasks: {} };
     }
-  } catch (e) {
-    console.error("Error reading local DB file on startup, starting fresh:", e);
+  } else {
+    dbData = { userSettings: {}, telegramLinks: {}, tasks: {} };
   }
 }
 
+// Initial boot load
+loadDb();
+
+/**
+ * Atomically writes database to disk using a temporary file + atomic rename.
+ * Prevents partial writes or corruption on crash.
+ */
 export function saveDb() {
   try {
     const tempDir = path.dirname(DB_PATH);
     if (!fs.existsSync(tempDir)) {
       fs.mkdirSync(tempDir, { recursive: true });
     }
-    fs.writeFileSync(DB_PATH, JSON.stringify(dbData, null, 2), "utf8");
+    const serialized = JSON.stringify(dbData, null, 2);
+    fs.writeFileSync(TEMP_DB_PATH, serialized, "utf8");
+    fs.renameSync(TEMP_DB_PATH, DB_PATH);
   } catch (e) {
-    console.error("Error writing to local DB file:", e);
+    console.error("Error atomically writing to local DB file:", e);
   }
 }
 
@@ -206,17 +245,11 @@ class MockBatch {
   }
 }
 
-export const mockFirestore = {
-  collection(name: string) {
-    return new MockCollection(name);
-  },
-  batch() {
-    return new MockBatch();
-  }
+export const MockFieldValue = {
+  delete: () => "DELETE_FIELD",
 };
 
-export const MockFieldValue = {
-  delete() {
-    return "DELETE_FIELD";
-  }
+export const mockFirestore = {
+  collection: (name: string) => new MockCollection(name),
+  batch: () => new MockBatch(),
 };

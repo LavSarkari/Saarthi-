@@ -2519,7 +2519,7 @@ export default function App() {
 
     pingIntervalRef.current = setInterval(() => {
       if (wsRef.current?.readyState === WebSocket.OPEN) {
-        setLatencyMs(Math.round(130 + Math.random() * 60));
+        setLatencyMs(135);
       }
     }, 3000);
 

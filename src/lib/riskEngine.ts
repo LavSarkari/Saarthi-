@@ -132,17 +132,36 @@ export function computeRiskScore(task: Task | Omit<Task, "riskScore" | "riskZone
     recoveryConfidenceBoost = 20;
   }
 
+  // 6. Phase 5 Commitment Semantics & Bill/Subscription Penalties
+  let commitmentTypePenalty = 0;
+  const isHard = task.commitmentType === "HARD" || task.isHardDeadline === true;
+  if (isHard && hoursRemaining < 24 && actualProgressRatio < 1.0) {
+    commitmentTypePenalty += 15;
+  }
+
+  if (task.category === "BILL") {
+    if (task.paymentStatus === "OVERDUE" || (hoursRemaining <= 0 && task.paymentStatus !== "PAID")) {
+      commitmentTypePenalty += 35;
+      pressureReason = "Unpaid bill due date passed (OVERDUE)";
+    }
+  } else if (task.category === "SUBSCRIPTION") {
+    if (task.subscriptionStatus === "ACTIVE" && hoursRemaining < 72 && actualProgressRatio < 1.0) {
+      commitmentTypePenalty += 15;
+      pressureReason = "Upcoming subscription renewal window";
+    }
+  }
+
   // --- Compile deterministic Risk Score (0-100) ---
   const baseUndoneRatio = 1.0 - actualProgressRatio;
   const baseRisk = baseUndoneRatio * 35; // starts with up to 35 baseline points based on undone work
 
-  let calculatedScore = baseRisk + finalVelocityPenalty + finalSchedulePressurePenalty + complexityPenalty + missedCommitmentPenalty - recoveryMitigation;
+  let calculatedScore = baseRisk + finalVelocityPenalty + finalSchedulePressurePenalty + complexityPenalty + missedCommitmentPenalty + commitmentTypePenalty - recoveryMitigation;
   
   // High boundary limiters
   let score = Math.max(0, Math.min(100, Math.round(calculatedScore)));
 
-  // If completely done, risk is strictly 0
-  if (actualProgressRatio >= 1.0) {
+  // If completely done or paid, risk is strictly 0
+  if (actualProgressRatio >= 1.0 || task.paymentStatus === "PAID") {
     score = 0;
   }
 
@@ -159,15 +178,15 @@ export function computeRiskScore(task: Task | Omit<Task, "riskScore" | "riskZone
 
   let calculatedConfidence = baselineConfidence + safetyCushionBonus - complexityConfidenceLoss - velocityConfidenceLoss + recoveryConfidenceBoost;
   
-  // If no remaining effort is needed, confidence is 100%
+  // If no remaining effort is needed or bill is paid, confidence is 100%
   let confidence = Math.max(0, Math.min(100, Math.round(calculatedConfidence)));
-  if (actualProgressRatio >= 1.0) {
+  if (actualProgressRatio >= 1.0 || task.paymentStatus === "PAID") {
     confidence = 100;
   }
 
   // Map to compatible RiskZone types
   let zone: RiskZone = "safe";
-  if (score >= 70 || (hoursRemaining < 3 && actualProgressRatio < 1.0)) {
+  if (score >= 70 || (hoursRemaining < 3 && actualProgressRatio < 1.0) || (task.category === "BILL" && task.paymentStatus === "OVERDUE")) {
     zone = "critical";
   } else if (score >= 40) {
     zone = "watch";

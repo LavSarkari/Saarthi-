@@ -65,7 +65,31 @@ export interface Task {
   isStuck?: boolean;
   isCompleted?: boolean;
   orderIndex?: number;
+  // Phase 1 Dependency Engine: Array of Task IDs that MUST be completed before this task can start
+  dependsOn?: string[];
+  // Phase 2/3 Deterministic Scheduler: Flag for non-negotiable hard deadlines
+  isHardDeadline?: boolean;
+  // Phase 5 Commitment Semantics & Bill/Subscription Types
+  commitmentType?: CommitmentType;
+  category?: CommitmentCategory;
+  amount?: number;
+  paymentStatus?: PaymentStatus;
+  subscriptionStatus?: SubscriptionStatus;
+  renewalDate?: string;
+  reminderStage?: ReminderStage;
+  // Phase 6 Notification Escalation & Idempotency Tracking
+  lastNotificationStage?: NotificationStage;
+  deliveredNotificationKeys?: string[];
 }
+
+export type CommitmentType = "HARD" | "FLEXIBLE";
+export type CommitmentCategory = "EXAM" | "INTERVIEW" | "BILL" | "SUBSCRIPTION" | "MILESTONE" | "PERSONAL_FLEXIBLE" | "STUDY";
+export type PaymentStatus = "UNPAID" | "PAID" | "OVERDUE";
+export type SubscriptionStatus = "ACTIVE" | "CANCELLED" | "EXPIRED";
+export type ReminderStage = "7_DAYS" | "3_DAYS" | "1_DAY" | "DUE_DATE" | "OVERDUE";
+export type NotificationStage = "UPCOMING" | "APPROACHING" | "URGENT" | "CRITICAL" | "DUE" | "OVERDUE" | "BLOCKED" | "MISSED" | "RESCHEDULED" | "RECOVERED";
+
+export type DependencyStatus = "READY" | "BLOCKED" | "IN_PROGRESS" | "COMPLETED" | "OVERDUE";
 
 export type RecoveryMode = "minimal" | "balanced" | "maximum" | "wellness";
 
@@ -261,6 +285,11 @@ export interface AdaptivePlanningState {
   averageScheduleStability: number;
   behaviorInfluence: number;
   lastOptimized: string;
+  hasSufficientData?: boolean;
+  dataStatus?: "INSUFFICIENT_DATA" | "SUFFICIENT_DATA";
+  completionRate?: number;
+  onTimeRate?: number;
+  averageDelayMinutes?: number;
 }
 
 export interface LearningProfile {

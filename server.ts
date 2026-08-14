@@ -17,6 +17,8 @@ import { dbData, saveDb } from "./src/services/localDb.js";
 import { generateContentWithRetryAndFallback } from "./src/services/geminiCall.js";
 import { computeRiskScore } from "./src/lib/riskEngine.js";
 import { engagementService } from "./src/services/engagementService.js";
+import { reschedulingService } from "./src/services/reschedulingService.js";
+import { notificationService } from "./src/services/notificationService.js";
 
 dotenv.config();
 
@@ -53,7 +55,17 @@ function getAiClient(req: express.Request): GoogleGenAI {
 const PORT = 3000;
 const HOST = "0.0.0.0";
 
-// --- API API routes FIRST ---
+// --- API routes FIRST ---
+
+// 0. Production Health Check API
+app.get("/api/health", (req, res) => {
+  return res.json({
+    status: "ok",
+    uptimeSeconds: Math.floor(process.uptime()),
+    version: "1.0.0",
+    timestamp: new Date().toISOString(),
+  });
+});
 
 // 1. Task Planner API: Decomposes a commitment into structured subtasks with estimated effort via plannerService
 app.post("/api/gemini/task-planner", async (req, res) => {
@@ -252,6 +264,26 @@ app.post("/api/telegram/sync-state", (req, res) => {
             userId
           };
         }
+      }
+
+      // Production-wired deterministic rescheduling & risk recalculation
+      const userTaskList = Object.values(dbData.tasks).filter((t: any) => t && t.userId === userId);
+      if (userTaskList.length > 0) {
+        reschedulingService.handleRescheduleTrigger({
+          userId,
+          triggerEvent: "NEW_COMMITMENT_ADDED",
+          tasks: userTaskList,
+          notifyUser: false,
+        }).then((res) => {
+          if (res.changed) {
+            for (const ut of res.updatedTasks) {
+              if (ut.id) dbData.tasks[ut.id] = ut;
+            }
+            saveDb();
+          }
+        }).catch((err) => {
+          console.warn("Auto-rescheduling error during sync-state:", err);
+        });
       }
     }
 
@@ -1147,43 +1179,145 @@ setupVite().then(() => {
       console.error("Error starting Telegram Bot polling on server boot:", err);
     });
 
-    // Background worker for Daily Digests
+    // Background worker for Daily Digests & Automated Maintenance
     const dispatchedDigests = new Set<string>();
-    setInterval(() => {
-      const now = new Date();
+    let backgroundMonitorTimer: NodeJS.Timeout | null = setInterval(() => {
+      try {
+        const now = new Date();
 
-      if (dbData.userSettings) {
-        for (const userId of Object.keys(dbData.userSettings)) {
-          const settings = dbData.userSettings[userId];
-          if (settings && settings.telegramChatId && settings.telegramAlertSlots && settings.telegramAlertsEnabled !== false) {
-            
-            let userTimeStr = now.toISOString().substring(11, 16);
-            let userDayStr = now.toISOString().split("T")[0];
-            
-            try {
-              if (settings.timezone) {
-                const timeFormatter = new Intl.DateTimeFormat("en-GB", { timeZone: settings.timezone, hour: "2-digit", minute: "2-digit" });
-                userTimeStr = timeFormatter.format(now);
-                
-                const dateFormatter = new Intl.DateTimeFormat("en-CA", { timeZone: settings.timezone, year: "numeric", month: "2-digit", day: "2-digit" });
-                userDayStr = dateFormatter.format(now);
+        if (dbData.userSettings) {
+          for (const userId of Object.keys(dbData.userSettings)) {
+            const settings = dbData.userSettings[userId];
+            if (settings && settings.telegramChatId && settings.telegramAlertSlots && settings.telegramAlertsEnabled !== false) {
+              
+              let userTimeStr = now.toISOString().substring(11, 16);
+              let userDayStr = now.toISOString().split("T")[0];
+              
+              try {
+                if (settings.timezone) {
+                  const timeFormatter = new Intl.DateTimeFormat("en-GB", { timeZone: settings.timezone, hour: "2-digit", minute: "2-digit" });
+                  userTimeStr = timeFormatter.format(now);
+                  
+                  const dateFormatter = new Intl.DateTimeFormat("en-CA", { timeZone: settings.timezone, year: "numeric", month: "2-digit", day: "2-digit" });
+                  userDayStr = dateFormatter.format(now);
+                }
+              } catch (err) {
+                console.error(`Invalid timezone for ${userId}: ${settings.timezone}`);
               }
-            } catch (err) {
-              console.error(`Invalid timezone for ${userId}: ${settings.timezone}`);
-            }
 
-            if (settings.telegramAlertSlots.includes(userTimeStr)) {
-              const digestKey = `${userId}-${userDayStr}-${userTimeStr}`;
-              if (!dispatchedDigests.has(digestKey)) {
-                dispatchedDigests.add(digestKey);
-                telegramService.handleBriefing(Number(settings.telegramChatId), userId).catch(err => {
-                  console.error(`Failed to send daily digest for ${userId}:`, err);
+              if (settings.telegramAlertSlots && settings.telegramAlertSlots.includes(userTimeStr)) {
+                const digestKey = `${userId}-${userDayStr}-${userTimeStr}`;
+                if (!dispatchedDigests.has(digestKey)) {
+                  dispatchedDigests.add(digestKey);
+                  telegramService.handleBriefing(Number(settings.telegramChatId), userId).catch(err => {
+                    console.error(`Failed to send daily digest for ${userId}:`, err);
+                  });
+                }
+              }
+
+              // Production Background Worker: Detect missed tasks & auto-reschedule downstream
+              if (dbData.tasks) {
+                const userTasks = Object.values(dbData.tasks).filter((t: any) => t && t.userId === userId);
+                
+                // Phase 5 & 6: Bill Overdue, Escalation Reminders, and Notification Engine
+                (async () => {
+                  try {
+                    const { updatedTasks: billTasks } = taskService.processBillAndSubscriptionMonitoring(userTasks, now);
+                    const { newRenewalTasks } = taskService.generateSubscriptionRenewals(userTasks, now);
+
+                    let dbMutated = false;
+                    for (const ut of billTasks) {
+                      if (ut.id) {
+                        dbData.tasks[ut.id] = ut;
+                        dbMutated = true;
+                      }
+                    }
+                    for (const nr of newRenewalTasks) {
+                      if (nr.id) {
+                        dbData.tasks[nr.id] = nr;
+                        dbMutated = true;
+                      }
+                    }
+
+                    // Evaluate deterministic notification escalation & dispatch safely
+                    const currentTasks = Object.values(dbData.tasks).filter((t: any) => t && t.userId === userId);
+                    const { updatedTasks: notifTasks } = await notificationService.evaluateAndDispatchNotifications(currentTasks, {
+                      now,
+                      telegramChatId: settings.telegramChatId,
+                    });
+
+                    for (const nt of notifTasks) {
+                      if (nt.id) {
+                        dbData.tasks[nt.id] = nt;
+                        dbMutated = true;
+                      }
+                    }
+
+                    if (dbMutated) saveDb();
+                  } catch (monErr) {
+                    console.warn("Background bill/subscription/notification monitor error:", monErr);
+                  }
+                })();
+
+                // Phase 3: Detect missed tasks & auto-reschedule downstream
+                const uncompletedUserTasks = userTasks.filter((t: any) => !t.isCompleted);
+                const missedTask = uncompletedUserTasks.find((t: any) => {
+                  const lastSub = [...(t.subtasks || [])].reverse().find((s: any) => s.scheduledEnd);
+                  return lastSub?.scheduledEnd && new Date(lastSub.scheduledEnd).getTime() < now.getTime() && !t.isCompleted;
                 });
+
+                if (missedTask) {
+                  reschedulingService.handleRescheduleTrigger({
+                    userId,
+                    triggerEvent: "TASK_MISSED",
+                    triggerTaskId: missedTask.id,
+                    tasks: Object.values(dbData.tasks).filter((t: any) => t && t.userId === userId),
+                    notifyUser: true,
+                  }).then((res) => {
+                    if (res.changed) {
+                      for (const ut of res.updatedTasks) {
+                        if (ut.id) dbData.tasks[ut.id] = ut;
+                      }
+                      saveDb();
+
+                      if (settings.telegramChatId && res.notificationsFired.length > 0) {
+                        for (const msg of res.notificationsFired) {
+                          telegramService.sendMessage(Number(settings.telegramChatId), msg).catch(() => {});
+                        }
+                      }
+                    }
+                  }).catch((err) => {
+                    console.warn("Background auto-rescheduling failed:", err);
+                  });
+                }
               }
             }
           }
         }
+      } catch (workerErr) {
+        console.error("Uncaught exception in background monitor loop (isolated):", workerErr);
       }
-    }, 15000); // Check every 15 seconds to ensure we don't miss a minute
+    }, 15000); // Check every 15 seconds
+
+    // Graceful Shutdown Registration
+    const handleShutdown = (signal: string) => {
+      console.log(`Received ${signal}. Performing graceful shutdown...`);
+      if (backgroundMonitorTimer) {
+        clearInterval(backgroundMonitorTimer);
+        backgroundMonitorTimer = null;
+      }
+      saveDb();
+      server.close(() => {
+        console.log("Saarthi server closed cleanly.");
+        process.exit(0);
+      });
+      setTimeout(() => {
+        console.error("Forced exit after shutdown timeout.");
+        process.exit(1);
+      }, 5000).unref();
+    };
+
+    process.once("SIGINT", () => handleShutdown("SIGINT"));
+    process.once("SIGTERM", () => handleShutdown("SIGTERM"));
   });
 });
